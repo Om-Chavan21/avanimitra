@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+@import '@fontsource/roboto/300.css';
+@import '@fontsource/roboto/400.css';
+@import '@fontsource/roboto/500.css';
+@import '@fontsource/roboto/700.css';
+
+@theme {
+    --color-g1: #324b2e;
+    --color-g2: #81823e;
+    --color-g3: #ceb84c;
+    --color-g4: #e4c128;
+    --color-y1: #e7a213;
+    --color-y2: #f1b60b;
+    --color-y3: #fac903;
+}

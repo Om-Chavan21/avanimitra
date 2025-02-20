@@ -1,0 +1,1 @@
+I want to implement auth in the above app based on the password created during opt-in. Give me changes/additions to make to both the backend and frontend files and give entire codes of the updated files from start to end
