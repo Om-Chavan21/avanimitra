@@ -3,19 +3,19 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from typing import Optional
+from typing import Optional, List
 import os
 from dotenv import load_dotenv
 from bson import ObjectId
 
-from database import users_collection
-from models import UserCreate, UserResponse, LoginRequest, Token, UserInDB
+from database import users_collection, serialize_doc_id, serialize_list
+from models import UserCreate, UserResponse, UserUpdate, LoginRequest, Token, UserInDB
 
 load_dotenv()
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -152,6 +152,159 @@ async def read_users_me(current_user: UserInDB = Depends(get_current_user)):
     return current_user
 
 
+@router.put("/users/me", response_model=UserResponse)
+async def update_user(
+    user_update: UserUpdate, current_user: UserInDB = Depends(get_current_user)
+):
+    # Get current user data
+    user_data = await users_collection.find_one({"_id": ObjectId(current_user.id)})
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Prepare update data
+    update_data = {k: v for k, v in user_update.dict().items() if v is not None}
+
+    # Hash password if it's being updated
+    if "password" in update_data:
+        update_data["password"] = get_password_hash(update_data["password"])
+
+    # Update user
+    await users_collection.update_one(
+        {"_id": ObjectId(current_user.id)}, {"$set": update_data}
+    )
+
+    # Get updated user
+    updated_user = await users_collection.find_one({"_id": ObjectId(current_user.id)})
+    updated_user = serialize_doc_id(updated_user)
+    del updated_user["password"]
+
+    return updated_user
+
+
+# --- Admin user management routes ---
+
+
+@router.get("/admin/users", response_model=List[UserResponse])
+async def get_all_users(current_user: UserInDB = Depends(get_current_user)):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+
+    users = await users_collection.find().to_list(1000)
+    users = serialize_list(users)
+
+    # Remove passwords from response
+    for user in users:
+        if "password" in user:
+            del user["password"]
+
+    return users
+
+
+@router.post("/admin/users", response_model=UserResponse)
+async def create_user_as_admin(
+    user: UserCreate,
+    is_admin: bool = False,
+    current_user: UserInDB = Depends(get_current_user),
+):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+
+    # Check if phone number exists
+    user_exists = await users_collection.find_one({"phone": user.phone})
+    if user_exists:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number already registered",
+        )
+
+    # Create new user
+    user_dict = user.dict()
+    user_dict["password"] = get_password_hash(user.password)
+    user_dict["is_admin"] = is_admin
+
+    # Insert user to database
+    result = await users_collection.insert_one(user_dict)
+    user_dict["id"] = str(result.inserted_id)
+
+    # Remove password field from response
+    del user_dict["password"]
+
+    return user_dict
+
+
+@router.put("/admin/users/{user_id}", response_model=UserResponse)
+async def update_user_as_admin(
+    user_id: str,
+    user_update: UserUpdate,
+    is_admin: Optional[bool] = None,
+    current_user: UserInDB = Depends(get_current_user),
+):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+
+    # Check if user exists
+    user_data = await users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Prepare update data
+    update_data = {k: v for k, v in user_update.dict().items() if v is not None}
+
+    # Set is_admin status if provided
+    if is_admin is not None:
+        update_data["is_admin"] = is_admin
+
+    # Hash password if it's being updated
+    if "password" in update_data:
+        update_data["password"] = get_password_hash(update_data["password"])
+
+    # Update user
+    await users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": update_data})
+
+    # Get updated user
+    updated_user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    updated_user = serialize_doc_id(updated_user)
+    del updated_user["password"]
+
+    return updated_user
+
+
+@router.delete("/admin/users/{user_id}", response_model=dict)
+async def delete_user_as_admin(
+    user_id: str, current_user: UserInDB = Depends(get_current_user)
+):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+
+    # Check if user exists
+    user_data = await users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Delete user
+    await users_collection.delete_one({"_id": ObjectId(user_id)})
+
+    return {"message": "User deleted successfully"}
+
+
 # Create an admin user (for testing purposes)
 @router.post("/create-admin", include_in_schema=False)
 async def create_admin():
@@ -161,9 +314,9 @@ async def create_admin():
         return {"message": "Admin already exists"}
 
     admin_data = {
-        "name": "Om Chavan",
-        "phone": "8390770254",
-        "address": "",
+        "name": "Admin User",
+        "phone": "9999999999",
+        "address": "Admin Address",
         "password": get_password_hash("admin123"),
         "is_admin": True,
     }

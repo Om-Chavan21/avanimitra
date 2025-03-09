@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { 
   Container, 
   Typography, 
@@ -8,7 +8,8 @@ import {
   Box, 
   Paper,
   InputAdornment,
-  Alert
+  Alert,
+  Link
 } from '@mui/material';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
@@ -48,95 +49,100 @@ const Login = () => {
     }
     
     if (!formData.password) {
-        newErrors.password = 'Password is required';
-      }
-      
-      setErrors(newErrors);
-      return Object.keys(newErrors).length === 0;
-    };
-  
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      
-      if (!validateForm()) return;
-      
-      const result = await login(formData.phone, formData.password);
-      
-      if (result.success) {
-        navigate('/dashboard');
-      } else {
-        setSubmitError(result.message);
-      }
-    };
-  
-    return (
-      <Container maxWidth="sm">
-        <Paper elevation={3} className="p-6 mt-8">
-          <Typography variant="h4" component="h1" align="center" gutterBottom>
-            Login
-          </Typography>
-          
-          {submitError && (
-            <Alert severity="error" className="mb-4">
-              {submitError}
-            </Alert>
-          )}
-          
-          <form onSubmit={handleSubmit}>
-            <TextField
-              label="Phone Number"
-              variant="outlined"
-              fullWidth
-              margin="normal"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              error={!!errors.phone}
-              helperText={errors.phone}
-              InputProps={{
-                startAdornment: <InputAdornment position="start">+91</InputAdornment>,
-              }}
-              inputProps={{ maxLength: 10 }}
-            />
-            
-            <PasswordField
-              id="password"
-              label="Password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              error={!!errors.password}
-              helperText={errors.password}
-            />
-            
-            <Box className="mt-6">
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                fullWidth
-                size="large"
-              >
-                Login
-              </Button>
-            </Box>
-            
-            <Box className="mt-4 text-center">
-              <Typography variant="body2">
-                Don't have an account?{' '}
-                <Button
-                  color="primary"
-                  onClick={() => navigate('/signup')}
-                >
-                  Sign Up
-                </Button>
-              </Typography>
-            </Box>
-          </form>
-        </Paper>
-      </Container>
-    );
+      newErrors.password = 'Password is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
-  
-  export default Login;
-  
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+    
+    const result = await login(formData.phone, formData.password);
+    
+    if (result.success) {
+      navigate('/');
+    } else {
+      setSubmitError(result.message);
+    }
+  };
+
+  return (
+    <Container maxWidth="sm">
+      <Paper elevation={3} className="p-6 mt-8">
+        <Typography variant="h4" component="h1" align="center" gutterBottom>
+          Login
+        </Typography>
+        
+        {submitError && (
+          <Alert severity="error" className="mb-4">
+            {submitError}
+          </Alert>
+        )}
+        
+        <form onSubmit={handleSubmit}>
+          <TextField
+            label="Phone Number"
+            variant="outlined"
+            fullWidth
+            margin="normal"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            error={!!errors.phone}
+            helperText={errors.phone}
+            InputProps={{
+              startAdornment: <InputAdornment position="start">+91</InputAdornment>,
+            }}
+            inputProps={{ maxLength: 10 }}
+          />
+          
+          <PasswordField
+            id="password"
+            label="Password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            error={!!errors.password}
+            helperText={errors.password}
+          />
+          
+          <Box className="mt-6">
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              fullWidth
+              size="large"
+            >
+              Login
+            </Button>
+          </Box>
+          
+          <Box className="mt-4 text-center">
+            <Typography variant="body2">
+              Don't have an account?{' '}
+              <Link component={RouterLink} to="/signup">
+                Sign Up
+              </Link>
+            </Typography>
+          </Box>
+          
+          <Box className="mt-2 text-center">
+            <Typography variant="body2">
+              Are you an admin?{' '}
+              <Link component={RouterLink} to="/admin-login">
+                Admin Login
+              </Link>
+            </Typography>
+          </Box>
+        </form>
+      </Paper>
+    </Container>
+  );
+};
+
+export default Login;

@@ -2,4 +2,4 @@ farm-stack-course/venv
 .env
 
 node_modules
-pycache
+__pycache__

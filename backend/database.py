@@ -1,16 +1,90 @@
 import motor.motor_asyncio
 from os import environ
 from dotenv import load_dotenv
+from bson import ObjectId
+from datetime import datetime
 
 load_dotenv()
 
 MONGODB_URI = environ.get("MONGODB_URI")
-DATABASE_NAME = environ.get("DATABASE_NAME")
-
-if not MONGODB_URI or not DATABASE_NAME:
-    raise ValueError("MONGODB_URI and DATABASE_NAME must be set in the environment")
-
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URI)
-database = client[DATABASE_NAME]
+database = client.ecommerce
 
-users_collection = database["users"]
+users_collection = database.users
+products_collection = database.products
+carts_collection = database.carts
+orders_collection = database.orders
+
+
+# Helper functions to convert between MongoDB ObjectId and string
+def get_object_id(id_str):
+    if isinstance(id_str, str):
+        return ObjectId(id_str)
+    return id_str
+
+
+def serialize_doc_id(doc):
+    if doc and "_id" in doc:
+        doc["id"] = str(doc["_id"])
+        del doc["_id"]
+    return doc
+
+
+def serialize_list(docs):
+    return [serialize_doc_id(doc) for doc in docs]
+
+
+# Cart operations
+async def get_user_cart(user_id):
+    cart = await carts_collection.find_one({"user_id": user_id})
+    if not cart:
+        # Create empty cart if it doesn't exist
+        cart = {"user_id": user_id, "items": []}
+        await carts_collection.insert_one(cart)
+    return serialize_doc_id(cart)
+
+
+async def add_to_cart(user_id, product_id, quantity=1):
+    cart = await get_user_cart(user_id)
+
+    # Check if item already exists in cart
+    found = False
+    if "items" in cart:
+        for item in cart["items"]:
+            if item["product_id"] == product_id:
+                item["quantity"] += quantity
+                found = True
+                break
+
+    # Add new item if not found
+    if not found:
+        if "items" not in cart:
+            cart["items"] = []
+        cart["items"].append({"product_id": product_id, "quantity": quantity})
+
+    # Update cart in database
+    await carts_collection.update_one(
+        {"user_id": user_id}, {"$set": {"items": cart["items"]}}
+    )
+
+    return cart
+
+
+async def update_cart_item(user_id, product_id, quantity):
+    if quantity <= 0:
+        # Remove item if quantity is 0 or negative
+        await carts_collection.update_one(
+            {"user_id": user_id}, {"$pull": {"items": {"product_id": product_id}}}
+        )
+    else:
+        # Update quantity
+        await carts_collection.update_one(
+            {"user_id": user_id, "items.product_id": product_id},
+            {"$set": {"items.$.quantity": quantity}},
+        )
+
+    return await get_user_cart(user_id)
+
+
+async def clear_cart(user_id):
+    await carts_collection.update_one({"user_id": user_id}, {"$set": {"items": []}})

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { 
   Container, 
   Typography, 
@@ -8,10 +8,11 @@ import {
   Box, 
   Paper,
   InputAdornment,
-  Alert
+  Alert,
+  Link
 } from '@mui/material';
-import PasswordField from '../components/PasswordField';
-import { useAuth } from '../context/AuthContext';
+import PasswordField from '../../components/PasswordField';
+import { useAuth } from '../../context/AuthContext';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -124,12 +125,9 @@ const AdminLogin = () => {
           <Box className="mt-4 text-center">
             <Typography variant="body2">
               Regular user?{' '}
-              <Button
-                color="primary"
-                onClick={() => navigate('/login')}
-              >
+              <Link component={RouterLink} to="/login">
                 User Login
-              </Button>
+              </Link>
             </Typography>
           </Box>
         </form>

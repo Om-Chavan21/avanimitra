@@ -1,24 +1,12 @@
 import { useState } from 'react';
 import { 
-  FormControl, 
-  InputLabel, 
-  OutlinedInput, 
+  TextField, 
   InputAdornment, 
-  IconButton,
-  FormHelperText
+  IconButton 
 } from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 
-const PasswordField = ({ 
-  id, 
-  label, 
-  value, 
-  onChange, 
-  error = false,
-  helperText = '',
-  ...props 
-}) => {
+const PasswordField = ({ id, label, value, onChange, error, helperText, ...props }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleClickShowPassword = () => {
@@ -26,14 +14,18 @@ const PasswordField = ({
   };
 
   return (
-    <FormControl variant="outlined" fullWidth margin="normal" error={error}>
-      <InputLabel htmlFor={id}>{label}</InputLabel>
-      <OutlinedInput
-        id={id}
-        type={showPassword ? 'text' : 'password'}
-        value={value}
-        onChange={onChange}
-        endAdornment={
+    <TextField
+      id={id}
+      label={label}
+      type={showPassword ? 'text' : 'password'}
+      value={value}
+      onChange={onChange}
+      fullWidth
+      margin="normal"
+      error={error}
+      helperText={helperText}
+      InputProps={{
+        endAdornment: (
           <InputAdornment position="end">
             <IconButton
               aria-label="toggle password visibility"
@@ -43,12 +35,10 @@ const PasswordField = ({
               {showPassword ? <VisibilityOff /> : <Visibility />}
             </IconButton>
           </InputAdornment>
-        }
-        label={label}
-        {...props}
-      />
-      {helperText && <FormHelperText>{helperText}</FormHelperText>}
-    </FormControl>
+        ),
+      }}
+      {...props}
+    />
   );
 };
 

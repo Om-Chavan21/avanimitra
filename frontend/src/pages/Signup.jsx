@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { 
   Container, 
   Typography, 
@@ -8,7 +8,8 @@ import {
   Box, 
   Paper,
   InputAdornment,
-  Alert
+  Alert,
+  Link
 } from '@mui/material';
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
@@ -88,7 +89,7 @@ const Signup = () => {
 
   return (
     <Container maxWidth="sm">
-      <Paper elevation={3} className="p-6 mt-8">
+      <Paper elevation={3} className="p-6 my-8">
         <Typography variant="h4" component="h1" align="center" gutterBottom>
           Sign Up
         </Typography>
@@ -177,12 +178,9 @@ const Signup = () => {
           <Box className="mt-4 text-center">
             <Typography variant="body2">
               Already have an account?{' '}
-              <Button
-                color="primary"
-                onClick={() => navigate('/login')}
-              >
+              <Link component={RouterLink} to="/login">
                 Login
-              </Button>
+              </Link>
             </Typography>
           </Box>
         </form>
