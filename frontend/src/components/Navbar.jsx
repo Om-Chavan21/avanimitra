@@ -1,59 +1,42 @@
-import React, { useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { AppBar, Toolbar, Button, Box } from "@mui/material";
-import { AuthContext } from "../App";
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-const Navbar = () => {
-    const auth = useContext(AuthContext);
-    const navigate = useNavigate();
+function Navbar() {
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
-    const handleSignOut = () => {
-        auth.logout();
-        navigate("/login");
-    };
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
 
-    return (
-        <AppBar
-            position="static"
-            style={{ backgroundColor: "var(--color-g1)" }}
-        >
-            <Toolbar>
-                <Box display="flex" justifyContent="space-between" width="100%">
-                    <Box>
-                        <Button color="inherit" component={Link} to="/home">
-                            Home
-                        </Button>
-                    </Box>
-                    {auth.isLoggedIn ? (
-                        <Box>
-                            <Button
-                                color="inherit"
-                                component={Link}
-                                to="/edit-profile"
-                            >
-                                Edit Profile
-                            </Button>
-                            <Button color="inherit" onClick={handleSignOut}>
-                                Sign Out
-                            </Button>
-                        </Box>
-                    ) : (
-                        <>
-                            <Button
-                                color="inherit"
-                                component={Link}
-                                to="/login"
-                            >
-                                Login
-                            </Button>
-                            {/* Optionally add a sign-up button */}
-                            {/*<Button color="inherit" component={Link} to="/opt-in">Sign Up</Button>*/}
-                        </>
-                    )}
-                </Box>
-            </Toolbar>
-        </AppBar>
-    );
-};
+  return (
+    <nav className="flex justify-between items-center bg-gray-800 text-white py-4">
+      <Link to="/" className="pl-4">
+        Home
+      </Link>
+      {isAuthenticated ? (
+        <>
+          <Link to="/profile" className="px-4">
+            Profile
+          </Link>
+          <button onClick={handleLogout} className="px-4">
+            Logout
+          </button>
+        </>
+      ) : (
+        <>
+          <Link to="/login" className="px-4">
+            Login
+          </Link>
+          <Link to="/signup" className="px-4">
+            Sign Up
+          </Link>
+        </>
+      )}
+    </nav>
+  );
+}
 
 export default Navbar;
