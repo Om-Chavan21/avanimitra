@@ -38,13 +38,25 @@ const Footer = () => {
               Contact
             </Typography>
             <Typography variant="body2" component="p" gutterBottom>
-              Email: contact@avanimitra.com
+              Email: <MuiLink href="mailto:contact@avanimitra.com" color="inherit" underline="hover">
+                contact@avanimitra.com
+              </MuiLink>
             </Typography>
             <Typography variant="body2" component="p" gutterBottom>
-              Phone: +91 98765 43210
+              <MuiLink href="https://wa.me/918390770254" color="inherit" underline="hover" target="_blank" rel="noopener noreferrer">
+                Chat with us on WhatsApp
+              </MuiLink>
             </Typography>
             <Typography variant="body2" component="p" gutterBottom>
-              Address: 123, Green Avenue, Organic Valley
+              Phone: +91 8390770254
+            </Typography>
+            <Typography variant="body2" component="p" gutterBottom>
+              Address: Near MIT, Kothrud, Pune
+            </Typography>
+            <Typography variant="body2" component="p" gutterBottom>
+              <MuiLink href="https://www.instagram.com/avanimitraorganics" color="inherit" underline="hover" target="_blank" rel="noopener noreferrer">
+                <i className="fa-brands fa-instagram" /> Follow us on Instagram
+              </MuiLink>
             </Typography>
           </Grid>
         </Grid>

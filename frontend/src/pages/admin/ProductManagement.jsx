@@ -75,10 +75,13 @@ const ProductManagement = () => {
         name: product.name,
         description: product.description,
         price: product.price.toString(),
-        stock_quantity: product.stock_quantity.toString(),
-        category: product.category,
+        // stock_quantity: product.stock_quantity.toString(),
+        stock_quantity: '',
+        // category: product.category,
+        category: '',
         image_url: product.image_url,
-        status: product.status
+        // status: product.status
+        status: ''
       });
     } else {
       setFormData({

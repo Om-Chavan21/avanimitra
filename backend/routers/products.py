@@ -26,6 +26,23 @@ async def get_product(product_id: str):
     return serialize_doc_id(product)
 
 
+@router.get("/admin/products", response_model=List[ProductResponse])
+async def get_admin_products(current_user: UserInDB = Depends(get_current_user)):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+
+    # Retrieve all products, regardless of status
+    cursor = products_collection.find({})
+    products = await cursor.to_list(length=100)
+
+    # Serialize the MongoDB documents
+    serialized_products = [serialize_doc_id(product) for product in products]
+    return serialized_products
+
+
 @router.post("/admin/products", response_model=ProductResponse)
 async def create_product(
     product: ProductCreate, current_user: UserInDB = Depends(get_current_user)

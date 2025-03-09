@@ -3,3 +3,5 @@ farm-stack-course/venv
 
 node_modules
 __pycache__
+
+*.pyc

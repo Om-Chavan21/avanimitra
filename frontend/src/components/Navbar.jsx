@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { 
-  AppBar, Button, Toolbar, Typography, Box, IconButton, 
+import {
+  AppBar, Button, Toolbar, Typography, Box, IconButton,
   Badge, Menu, MenuItem, Avatar, Tooltip, Divider
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PersonIcon from '@mui/icons-material/Person';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
@@ -21,25 +23,36 @@ const Navbar = () => {
   const cartItems = cart?.cart?.items || [];
   
   const [profileAnchorEl, setProfileAnchorEl] = useState(null);
-
+  const [adminMenuAnchorEl, setAdminMenuAnchorEl] = useState(null);
+  
   const handleProfileMenuOpen = (event) => {
     setProfileAnchorEl(event.currentTarget);
   };
-
+  
   const handleProfileMenuClose = () => {
     setProfileAnchorEl(null);
   };
-
+  
+  const handleAdminMenuOpen = (event) => {
+    setAdminMenuAnchorEl(event.currentTarget);
+  };
+  
+  const handleAdminMenuClose = () => {
+    setAdminMenuAnchorEl(null);
+  };
+  
   const handleNavigate = (path) => {
     navigate(path);
     handleProfileMenuClose();
+    handleAdminMenuClose();
   };
-
+  
   const handleLogout = () => {
     logout();
     handleProfileMenuClose();
+    handleAdminMenuClose();
   };
-
+  
   return (
     <AppBar position="static">
       <Toolbar>
@@ -52,17 +65,48 @@ const Navbar = () => {
         {isAuthenticated ? (
           <Box display="flex" alignItems="center">
             {user?.is_admin ? (
-              <Button 
-                color="inherit" 
-                component={Link} 
-                to="/admin-dashboard"
-              >
-                Admin Panel
-              </Button>
+              <>
+                <Tooltip title="Admin Menu">
+                  <IconButton
+                    color="inherit"
+                    onClick={handleAdminMenuOpen}
+                    sx={{ ml: 2 }}
+                  >
+                    <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+                      <AdminPanelSettingsIcon />
+                    </Avatar>
+                  </IconButton>
+                </Tooltip>
+                <Menu
+                  anchorEl={adminMenuAnchorEl}
+                  open={Boolean(adminMenuAnchorEl)}
+                  onClose={handleAdminMenuClose}
+                  transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                  anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                >
+                  <MenuItem onClick={() => handleNavigate('/admin-dashboard')}>
+                    Dashboard
+                  </MenuItem>
+                  <MenuItem onClick={() => handleNavigate('/admin/products')}>
+                    Manage Products
+                  </MenuItem>
+                  <MenuItem onClick={() => handleNavigate('/admin/orders')}>
+                    Manage Orders
+                  </MenuItem>
+                  <MenuItem onClick={() => handleNavigate('/admin/users')}>
+                    Manage Users
+                  </MenuItem>
+                  <Divider />
+                  <MenuItem onClick={handleLogout}>
+                    <LogoutIcon fontSize="small" className="mr-2" />
+                    Logout
+                  </MenuItem>
+                </Menu>
+              </>
             ) : (
               <>
                 <Tooltip title="Cart">
-                  <IconButton 
+                  <IconButton
                     color="inherit"
                     component={Link}
                     to="/cart"
@@ -72,7 +116,6 @@ const Navbar = () => {
                     </Badge>
                   </IconButton>
                 </Tooltip>
-
                 <Tooltip title="Account">
                   <IconButton
                     color="inherit"
@@ -84,7 +127,6 @@ const Navbar = () => {
                     </Avatar>
                   </IconButton>
                 </Tooltip>
-
                 <Menu
                   anchorEl={profileAnchorEl}
                   open={Boolean(profileAnchorEl)}
@@ -100,6 +142,7 @@ const Navbar = () => {
                   </MenuItem>
                   <Divider />
                   <MenuItem onClick={handleLogout}>
+                    <LogoutIcon fontSize="small" className="mr-2" />
                     Logout
                   </MenuItem>
                 </Menu>

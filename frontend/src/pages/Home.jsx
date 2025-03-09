@@ -6,6 +6,7 @@ import {
 import ProductCard from '../components/ProductCard';
 import api from '../utils/api';
 import heroImage from '../assets/hero-bg.jpg'; // You'll need to add this image
+import Footer from '../components/Footer';
 
 const Home = () => {
   const [products, setProducts] = useState([]);
@@ -62,7 +63,7 @@ const Home = () => {
           <Typography 
             variant="body1" 
             align="center" 
-            className="max-w-2xl mx-auto"
+            className="mx-auto"
             sx={{ fontSize: { xs: '1rem', md: '1.1rem' } }}
           >
             Experience the pure taste of organic fruits, harvested at peak ripeness and delivered straight from our farms to your doorstep.
@@ -75,7 +76,7 @@ const Home = () => {
         <Typography variant="h3" component="h2" align="center" gutterBottom>
           Our Organic Products
         </Typography>
-        <Typography variant="body1" align="center" paragraph className="mb-8 max-w-2xl mx-auto">
+        <Typography variant="body1" align="center" paragraph className="mb-8 mx-auto">
           We grow our fruits without synthetic pesticides or fertilizers, ensuring you get the healthiest, most flavorful produce possible.
         </Typography>
 
@@ -135,6 +136,11 @@ const Home = () => {
           </Grid>
         </Container>
       </Box>
+
+      {/* Footer Section */}
+      <Footer />
+
+
     </div>
   );
 };
