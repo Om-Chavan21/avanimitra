@@ -1,109 +1,142 @@
-import React, { useState } from 'react';
-import { Box, TextField, Button, Paper, Typography } from '@mui/material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Container, 
+  Typography, 
+  TextField, 
+  Button, 
+  Box, 
+  Paper,
+  InputAdornment,
+  Alert
+} from '@mui/material';
+import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
 
-function Login() {
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState({ mobileNumber: '', password: '' });
+const Login = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { login } = useAuth();
+  
+  const [formData, setFormData] = useState({
+    phone: '',
+    password: ''
+  });
+  
+  const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
 
-  const from = location.state?.from?.pathname || '/';
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear validation error when user types
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
 
   const validateForm = () => {
-    let hasErrors = false;
-    const newErrors = { ...errors };
-
-    if (!mobileNumber || mobileNumber.length < 10) {
-      newErrors.mobileNumber = 'Please enter a valid mobile number';
-      hasErrors = true;
-    } else {
-      newErrors.mobileNumber = '';
+    const newErrors = {};
+    
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^\d{10}$/.test(formData.phone)) {
+      newErrors.phone = 'Phone number must be 10 digits';
     }
-
-    if (!password) {
-      newErrors.password = 'Password is required';
-      hasErrors = true;
-    } else {
-      newErrors.password = '';
-    }
-
-    setErrors(newErrors);
-    return !hasErrors;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    const success = await login(mobileNumber, password);
-    if (success) {
-      navigate(from, { replace: true });
-    }
-  };
-
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: 'calc(100vh - 64px)', // Adjust for navbar height
-        padding: 2,
-      }}
-    >
-      <Paper
-        elevation={3}
-        sx={{
-          p: 4,
-          maxWidth: 400,
-          width: '100%',
-        }}
-      >
-        <Typography variant="h5" component="h1" gutterBottom textAlign="center">
-          Login
-        </Typography>
-        <form onSubmit={handleSubmit}>
-          <TextField
-            label="Mobile Number"
-            value={mobileNumber}
-            onChange={(e) => setMobileNumber(e.target.value)}
-            sx={{ marginBottom: 2 }}
-            className="w-full"
-            error={!!errors.mobileNumber}
-            helperText={errors.mobileNumber}
-          />
-          <TextField
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            sx={{ marginBottom: 2 }}
-            className="w-full"
-            error={!!errors.password}
-            helperText={errors.password}
-          />
-          <Button
-            type="submit"
-            variant="contained"
-            fullWidth
-            sx={{ mt: 3, mb: 2 }}
-          >
+    
+    if (!formData.password) {
+        newErrors.password = 'Password is required';
+      }
+      
+      setErrors(newErrors);
+      return Object.keys(newErrors).length === 0;
+    };
+  
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      
+      if (!validateForm()) return;
+      
+      const result = await login(formData.phone, formData.password);
+      
+      if (result.success) {
+        navigate('/dashboard');
+      } else {
+        setSubmitError(result.message);
+      }
+    };
+  
+    return (
+      <Container maxWidth="sm">
+        <Paper elevation={3} className="p-6 mt-8">
+          <Typography variant="h4" component="h1" align="center" gutterBottom>
             Login
-          </Button>
-          <Typography variant="body2" align="center">
-            Don't have an account?{' '}
-            <Button variant="text" onClick={() => navigate('/signup')}>
-              Sign Up
-            </Button>
           </Typography>
-        </form>
-      </Paper>
-    </Box>
-  );
-}
-
-export default Login;
+          
+          {submitError && (
+            <Alert severity="error" className="mb-4">
+              {submitError}
+            </Alert>
+          )}
+          
+          <form onSubmit={handleSubmit}>
+            <TextField
+              label="Phone Number"
+              variant="outlined"
+              fullWidth
+              margin="normal"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              error={!!errors.phone}
+              helperText={errors.phone}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">+91</InputAdornment>,
+              }}
+              inputProps={{ maxLength: 10 }}
+            />
+            
+            <PasswordField
+              id="password"
+              label="Password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              error={!!errors.password}
+              helperText={errors.password}
+            />
+            
+            <Box className="mt-6">
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                fullWidth
+                size="large"
+              >
+                Login
+              </Button>
+            </Box>
+            
+            <Box className="mt-4 text-center">
+              <Typography variant="body2">
+                Don't have an account?{' '}
+                <Button
+                  color="primary"
+                  onClick={() => navigate('/signup')}
+                >
+                  Sign Up
+                </Button>
+              </Typography>
+            </Box>
+          </form>
+        </Paper>
+      </Container>
+    );
+  };
+  
+  export default Login;
+  

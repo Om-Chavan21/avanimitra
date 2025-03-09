@@ -1,76 +1,119 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
-import { toast } from 'react-toastify';
+import { createContext, useState, useContext, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
-const AuthContext = createContext(null);
+// Create the context
+const AuthContext = createContext(null); // Initialize with null instead of undefined
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const baseURL = import.meta.env.VITE_API_URL;
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
+  // Check if user is logged in on mount
   useEffect(() => {
-    // Check if token exists in local storage
-    const token = localStorage.getItem('token');
-    if (token) {
-      fetchUserData(token);
-    } else {
-      setLoading(false);
-    }
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (token) {
+        try {
+          const response = await api.get('/me', {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          
+          setUser(response.data);
+          setIsAuthenticated(true);
+        } catch (error) {
+          localStorage.removeItem('token');
+        }
+      }
+      
+      setIsLoading(false);
+    };
+
+    checkAuth();
   }, []);
 
-  const fetchUserData = async (token) => {
+  // Login function
+  const login = async (phone, password) => {
     try {
-      const response = await axios.get(`${baseURL}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUser(response.data);
-    } catch (error) {
-      console.error('Failed to fetch user data:', error);
-      localStorage.removeItem('token');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const login = async (mobileNumber, password) => {
-    try {
-      const formData = new FormData();
-      formData.append('username', mobileNumber);
-      formData.append('password', password);
-      
-      const response = await axios.post(`${baseURL}/token`, formData);
-      const { access_token } = response.data;
+      const response = await api.post('/login', { phone, password });
+      const { access_token, user_id, is_admin } = response.data;
       
       localStorage.setItem('token', access_token);
+      setUser({ id: user_id, is_admin });
+      setIsAuthenticated(true);
       
-      // Fetch user data
-      await fetchUserData(access_token);
-      
-      toast.success('Login successful!');
-      return true;
+      return { success: true };
     } catch (error) {
-      console.error('Login error:', error);
-      toast.error(error.response?.data?.detail || 'Login failed');
-      return false;
+      return { 
+        success: false, 
+        message: error.response?.data?.detail || 'Login failed'
+      };
     }
   };
 
+  // Admin login function
+  const adminLogin = async (phone, password) => {
+    try {
+      const response = await api.post('/admin-login', { phone, password });
+      const { access_token, user_id, is_admin } = response.data;
+      
+      localStorage.setItem('token', access_token);
+      setUser({ id: user_id, is_admin });
+      setIsAuthenticated(true);
+      
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: error.response?.data?.detail || 'Admin login failed'
+      };
+    }
+  };
+
+  // Signup function
+  const signup = async (userData) => {
+    try {
+      await api.post('/signup', userData);
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: error.response?.data?.detail || 'Signup failed'
+      };
+    }
+  };
+
+  // Logout function
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
-    toast.info('Logged out successfully');
+    setIsAuthenticated(false);
+    navigate('/');
   };
 
   const value = {
     user,
-    loading,
+    isAuthenticated,
+    isLoading,
     login,
-    logout,
-    isAuthenticated: !!user,
+    adminLogin,
+    signup,
+    logout
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      {!isLoading && children}
+    </AuthContext.Provider>
+  );
 };
 
-export const useAuth = () => useContext(AuthContext);
+// Create custom hook for using the auth context
+export const useAuth = () => {
+  return useContext(AuthContext);
+};

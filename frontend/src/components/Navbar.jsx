@@ -1,42 +1,61 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { AppBar, Button, Toolbar, Typography, Box } from '@mui/material';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-function Navbar() {
-  const { user, logout, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
+const Navbar = () => {
+  const auth = useAuth();
+  // Add a check to ensure auth exists before destructuring
+  const isAuthenticated = auth?.isAuthenticated;
+  const user = auth?.user;
+  const logout = auth?.logout;
 
   return (
-    <nav className="flex justify-between items-center bg-gray-800 text-white py-4">
-      <Link to="/" className="pl-4">
-        Home
-      </Link>
-      {isAuthenticated ? (
-        <>
-          <Link to="/profile" className="px-4">
-            Profile
+    <AppBar position="static">
+      <Toolbar>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Link to="/" className="text-white no-underline">
+            Authentication App
           </Link>
-          <button onClick={handleLogout} className="px-4">
-            Logout
-          </button>
-        </>
-      ) : (
-        <>
-          <Link to="/login" className="px-4">
-            Login
-          </Link>
-          <Link to="/signup" className="px-4">
-            Sign Up
-          </Link>
-        </>
-      )}
-    </nav>
+        </Typography>
+        
+        {isAuthenticated ? (
+          <Box>
+            {user?.is_admin && (
+              <Button 
+                color="inherit" 
+                component={Link} 
+                to="/admin-dashboard"
+              >
+                Admin Dashboard
+              </Button>
+            )}
+            <Button 
+              color="inherit" 
+              component={Link} 
+              to="/dashboard"
+            >
+              Dashboard
+            </Button>
+            <Button color="inherit" onClick={logout}>
+              Logout
+            </Button>
+          </Box>
+        ) : (
+          <Box>
+            <Button color="inherit" component={Link} to="/login">
+              Login
+            </Button>
+            <Button color="inherit" component={Link} to="/signup">
+              Sign Up
+            </Button>
+            <Button color="inherit" component={Link} to="/admin-login">
+              Admin Login
+            </Button>
+          </Box>
+        )}
+      </Toolbar>
+    </AppBar>
   );
-}
+};
 
 export default Navbar;

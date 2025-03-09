@@ -1,59 +1,115 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { adminApiClient } from '../apiClient';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { useState, useEffect } from 'react';
+import { 
+  Container, 
+  Typography, 
+  Paper, 
+  Box, 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableContainer, 
+  TableHead, 
+  TableRow
+} from '@mui/material';
+import api from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
-function AdminDashboard() {
+const AdminDashboard = () => {
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const checkAdminLoginStatus = async () => {
+    // This is a mock function since we don't have an endpoint for this
+    // In a real application, you would fetch users from the backend
+    const mockUsers = [
+      { id: '1', name: 'John Doe', phone: '9876543210', address: 'Mumbai, India' },
+      { id: '2', name: 'Jane Smith', phone: '8765432109', address: 'Delhi, India' },
+      { id: '3', name: 'Bob Johnson', phone: '7654321098', address: 'Bangalore, India' },
+    ];
+
+    // Simulate API call
+    setTimeout(() => {
+      setUsers(mockUsers);
+      setLoading(false);
+    }, 1000);
+
+    // In a real app, you'd do something like:
+    /*
+    const fetchUsers = async () => {
       try {
-        console.log('Attempting to fetch users...');
-        const response = await adminApiClient.get('/admin/users');
-        console.log('Users fetched successfully:', response.data);
-        setUsers(response.data);
-        setIsAdminLoggedIn(true);
-      } catch (error) {
-        console.error('Error fetching users:', error);
-        if (error.response) {
-          console.log('Error response:', error.response);
-          if (error.response.status === 401) {
-            console.log('Unauthorized. Redirecting to login...');
-            navigate('/admin/login', { state: { from: location.pathname }, replace: true });
-          } else {
-            toast.error(error.response.data.detail || 'Failed to load users');
+        const token = localStorage.getItem('token');
+        const response = await api.get('/users', {
+          headers: {
+            Authorization: `Bearer ${token}`
           }
-        } else {
-          toast.error('An error occurred while loading users');
-        }
+        });
+        setUsers(response.data);
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to fetch users');
+        setLoading(false);
       }
     };
-    checkAdminLoginStatus();
-  }, [navigate, location.pathname]);
 
-  if (!isAdminLoggedIn) {
-    return null; // Or render a loading indicator
-  }
+    fetchUsers();
+    */
+  }, []);
 
   return (
-    <div>
-      <h2>Admin Dashboard</h2>
-      <p>Welcome to the admin dashboard.</p>
-      <h3>Users:</h3>
-      <ul>
-        {users.map((user) => (
-          <li key={user._id}>
-            {user.name} ({user.mobile_number})
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Container maxWidth="lg">
+      <Paper elevation={3} className="p-6 mt-8">
+        <Typography variant="h4" component="h1" gutterBottom>
+          Admin Dashboard
+        </Typography>
+        
+        <Typography variant="body1" paragraph>
+          Welcome to the admin dashboard! You have administrator privileges.
+        </Typography>
+        
+        <Box className="mt-4 mb-6 p-4 bg-gray-100 rounded-lg">
+          <Typography variant="h6" gutterBottom>
+            Admin Information:
+          </Typography>
+          <Typography>
+            Admin ID: {user?.id}
+          </Typography>
+        </Box>
+        
+        <Typography variant="h5" gutterBottom className="mt-8">
+          User Management
+        </Typography>
+        
+        {loading ? (
+          <Typography>Loading users...</Typography>
+        ) : error ? (
+          <Typography color="error">{error}</Typography>
+        ) : (
+          <TableContainer component={Paper} className="mt-4">
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell><strong>Name</strong></TableCell>
+                  <TableCell><strong>Phone</strong></TableCell>
+                  <TableCell><strong>Address</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>+91 {user.phone}</TableCell>
+                    <TableCell>{user.address}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+    </Container>
   );
-}
+};
 
 export default AdminDashboard;

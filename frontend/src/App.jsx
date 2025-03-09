@@ -1,41 +1,61 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { AuthProvider } from './context/AuthContext';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+
+// Components
 import Navbar from './components/Navbar';
-import SignUpForm from './pages/SignUpForm';
+
+// Pages
+import Home from './pages/Home';
 import Login from './pages/Login';
-import Profile from './pages/Profile';
+import Signup from './pages/Signup';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import UserDashboard from './pages/UserDashboard';
+
+// Protected Route wrapper
+const ProtectedRoute = ({ children, adminOnly = false }) => {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  if (adminOnly && !user?.is_admin) {
+    return <Navigate to="/" />;
+  }
+
+  return children;
+};
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
-        <Navbar />
+    <div className="App">
+      <Navbar />
+      <div className="container mx-auto p-4">
         <Routes>
-          <Route path="/" element={<div>Welcome to the Ecommerce App</div>} />
+          <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUpForm />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
+          <Route 
+            path="/admin-dashboard" 
+            element={
+              <ProtectedRoute adminOnly={true}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <UserDashboard />
+              </ProtectedRoute>
+            } 
+          />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </div>
+    </div>
   );
 }
 

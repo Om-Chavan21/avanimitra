@@ -13,15 +13,16 @@ import {
 import PasswordField from '../components/PasswordField';
 import { useAuth } from '../context/AuthContext';
 
-const AdminLogin = () => {
+const Signup = () => {
   const navigate = useNavigate();
-  const { adminLogin } = useAuth();
-  
+  const { signup } = useAuth();
   const [formData, setFormData] = useState({
+    name: '',
     phone: '',
-    password: ''
+    address: '',
+    password: '',
+    confirmPassword: ''
   });
-  
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
 
@@ -41,14 +42,28 @@ const AdminLogin = () => {
   const validateForm = () => {
     const newErrors = {};
     
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
     } else if (!/^\d{10}$/.test(formData.phone)) {
       newErrors.phone = 'Phone number must be 10 digits';
     }
     
+    if (!formData.address.trim()) {
+      newErrors.address = 'Address is required';
+    }
+    
     if (!formData.password) {
       newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
     }
     
     setErrors(newErrors);
@@ -60,10 +75,12 @@ const AdminLogin = () => {
     
     if (!validateForm()) return;
     
-    const result = await adminLogin(formData.phone, formData.password);
+    const { confirmPassword, ...userData } = formData;
+    
+    const result = await signup(userData);
     
     if (result.success) {
-      navigate('/admin-dashboard');
+      navigate('/login');
     } else {
       setSubmitError(result.message);
     }
@@ -73,7 +90,7 @@ const AdminLogin = () => {
     <Container maxWidth="sm">
       <Paper elevation={3} className="p-6 mt-8">
         <Typography variant="h4" component="h1" align="center" gutterBottom>
-          Admin Login
+          Sign Up
         </Typography>
         
         {submitError && (
@@ -83,6 +100,18 @@ const AdminLogin = () => {
         )}
         
         <form onSubmit={handleSubmit}>
+          <TextField
+            label="Full Name"
+            variant="outlined"
+            fullWidth
+            margin="normal"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            error={!!errors.name}
+            helperText={errors.name}
+          />
+          
           <TextField
             label="Phone Number"
             variant="outlined"
@@ -99,6 +128,20 @@ const AdminLogin = () => {
             inputProps={{ maxLength: 10 }}
           />
           
+          <TextField
+            label="Address"
+            variant="outlined"
+            fullWidth
+            margin="normal"
+            name="address"
+            value={formData.address}
+            onChange={handleChange}
+            error={!!errors.address}
+            helperText={errors.address}
+            multiline
+            rows={2}
+          />
+          
           <PasswordField
             id="password"
             label="Password"
@@ -109,6 +152,16 @@ const AdminLogin = () => {
             helperText={errors.password}
           />
           
+          <PasswordField
+            id="confirmPassword"
+            label="Confirm Password"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            error={!!errors.confirmPassword}
+            helperText={errors.confirmPassword}
+          />
+          
           <Box className="mt-6">
             <Button
               type="submit"
@@ -117,18 +170,18 @@ const AdminLogin = () => {
               fullWidth
               size="large"
             >
-              Login as Admin
+              Sign Up
             </Button>
           </Box>
           
           <Box className="mt-4 text-center">
             <Typography variant="body2">
-              Regular user?{' '}
+              Already have an account?{' '}
               <Button
                 color="primary"
                 onClick={() => navigate('/login')}
               >
-                User Login
+                Login
               </Button>
             </Typography>
           </Box>
@@ -138,4 +191,4 @@ const AdminLogin = () => {
   );
 };
 
-export default AdminLogin;
+export default Signup;
