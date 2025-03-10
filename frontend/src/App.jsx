@@ -20,6 +20,7 @@ import Cart from './pages/Cart';
 import OrderHistory from './pages/OrderHistory';
 import OrderDetails from './pages/OrderDetails';
 import Profile from './pages/Profile';
+import NotFound from './pages/NotFound';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -134,6 +135,7 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>
