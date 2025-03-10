@@ -1,7 +1,10 @@
 farm-stack-course/venv
 .env
 
-node_modules
-__pycache__
+node_modules/
+__pycache__/
+**/__pycache__/
 
 *.pyc
+# Local Netlify folder
+.netlify
