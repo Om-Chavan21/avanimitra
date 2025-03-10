@@ -13,6 +13,7 @@ from models import (
     ProductResponse,
     OrderItemResponse,
     AdminOrderCreate,
+    OrderItem,
 )
 from database import (
     orders_collection,
@@ -201,7 +202,7 @@ async def get_all_orders(
 
 
 @router.put("/admin/orders/{order_id}", response_model=OrderResponse)
-async def update_order_status(
+async def update_order(
     order_id: str,
     order_update: OrderUpdate,
     current_user: UserInDB = Depends(get_current_user),
@@ -227,6 +228,42 @@ async def update_order_status(
     if order_update.payment_status is not None:
         update_data["payment_status"] = order_update.payment_status
 
+    if order_update.delivery_address is not None:
+        update_data["delivery_address"] = order_update.delivery_address
+
+    if order_update.receiver_phone is not None:
+        update_data["receiver_phone"] = order_update.receiver_phone
+
+    # Handle items update if provided
+    if order_update.items is not None:
+        items_data = []
+        total_amount = 0
+
+        # Process each item
+        for item in order_update.items:
+            # Verify the product exists
+            product = await products_collection.find_one(
+                {"_id": ObjectId(item.product_id)}
+            )
+            if not product:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Product with id {item.product_id} not found",
+                )
+
+            # Add item to order
+            order_item = {
+                "product_id": item.product_id,
+                "quantity": item.quantity,
+                "price_at_purchase": item.price_at_purchase,
+            }
+
+            items_data.append(order_item)
+            total_amount += item.price_at_purchase * item.quantity
+
+        update_data["items"] = items_data
+        update_data["total_amount"] = total_amount
+
     if update_data:
         await orders_collection.update_one(
             {"_id": ObjectId(order_id)}, {"$set": update_data}
@@ -239,6 +276,27 @@ async def update_order_status(
     order_response = await format_order_response(serialize_doc_id(updated_order))
 
     return order_response
+
+
+@router.delete("/admin/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_order(
+    order_id: str, current_user: UserInDB = Depends(get_current_user)
+):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+
+    # Check if order exists
+    order = await orders_collection.find_one({"_id": ObjectId(order_id)})
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+        )
+
+    # Delete order
+    await orders_collection.delete_one({"_id": ObjectId(order_id)})
 
 
 @router.post("/admin/custom-orders", response_model=OrderResponse)

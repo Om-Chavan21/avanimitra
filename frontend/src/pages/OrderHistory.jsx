@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Container, Typography, Box, Paper, Tabs, Tab, 
+  Container, Typography, Box, Paper, Tabs, Tab,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Button, Chip, CircularProgress
+  Button, Chip, CircularProgress, Alert
 } from '@mui/material';
 import { format } from 'date-fns';
 import api from '../utils/api';
@@ -13,7 +13,7 @@ const OrderHistory = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tabValue, setTabValue] = useState(0);
-  
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -31,14 +31,13 @@ const OrderHistory = () => {
         setLoading(false);
       }
     };
-    
     fetchOrders();
   }, []);
-  
+
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
-  
+
   const getStatusColor = (status) => {
     switch(status) {
       case 'pending':
@@ -56,18 +55,31 @@ const OrderHistory = () => {
     }
   };
   
+  const getPaymentStatusColor = (status) => {
+    switch(status) {
+      case 'paid':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'failed':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
   const formatDate = (dateString) => {
     return format(new Date(dateString), 'dd MMM yyyy, h:mm a');
   };
-  
-  const activeOrders = orders.filter(order => 
+
+  const activeOrders = orders.filter(order =>
     ['pending', 'processing', 'shipped'].includes(order.order_status)
   );
-  
-  const pastOrders = orders.filter(order => 
+
+  const pastOrders = orders.filter(order =>
     ['delivered', 'cancelled'].includes(order.order_status)
   );
-  
+
   const displayOrders = tabValue === 0 ? activeOrders : pastOrders;
 
   if (loading) {
@@ -87,8 +99,8 @@ const OrderHistory = () => {
       </Typography>
       
       <Paper className="mb-6">
-        <Tabs 
-          value={tabValue} 
+        <Tabs
+          value={tabValue}
           onChange={handleTabChange}
           indicatorColor="primary"
           textColor="primary"
@@ -100,19 +112,19 @@ const OrderHistory = () => {
       </Paper>
       
       {error ? (
-        <Paper className="p-4 text-center text-red-500">
+        <Alert severity="error" className="mb-4">
           {error}
-        </Paper>
+        </Alert>
       ) : displayOrders.length === 0 ? (
         <Paper className="p-6 text-center">
           <Typography variant="h6">
             {tabValue === 0 ? "No active orders" : "No past orders"}
           </Typography>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            component={Link} 
-            to="/" 
+          <Button
+            variant="contained"
+            color="primary"
+            component={Link}
+            to="/"
             className="mt-4"
           >
             Shop Now
@@ -128,6 +140,7 @@ const OrderHistory = () => {
                 <TableCell>Items</TableCell>
                 <TableCell>Total Amount</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Payment Status</TableCell>
                 <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
@@ -139,21 +152,40 @@ const OrderHistory = () => {
                   <TableCell>{order.items.length} items</TableCell>
                   <TableCell>₹{order.total_amount.toFixed(2)}</TableCell>
                   <TableCell>
-                    <Chip 
-                      label={order.order_status.toUpperCase()} 
-                      color={getStatusColor(order.order_status)} 
+                    <Chip
+                      label={order.order_status.toUpperCase()}
+                      color={getStatusColor(order.order_status)}
                       size="small"
                     />
                   </TableCell>
                   <TableCell>
-                    <Button 
-                      variant="outlined" 
-                      size="small" 
-                      component={Link} 
+                    <Chip
+                      label={order.payment_status.toUpperCase()}
+                      color={getPaymentStatusColor(order.payment_status)}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      component={Link}
                       to={`/orders/${order.id}`}
                     >
                       View Details
                     </Button>
+                    {/* {order.order_status !== 'cancelled' && 
+                     order.order_status !== 'delivered' && (
+                      <Button
+                        variant="text"
+                        color="error"
+                        size="small"
+                        className="ml-2"
+                        onClick={() => handleCancelRequest(order.id)}
+                      >
+                        Cancel
+                      </Button>
+                    )} */}
                   </TableCell>
                 </TableRow>
               ))}

@@ -4,11 +4,16 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, FormControl, InputLabel, Select, MenuItem, 
-  Chip, Tab, Tabs, Divider, Card, CardContent, CardMedia, Alert
+  Chip, Tab, Tabs, Divider, Card, CardContent, CardMedia, Alert,
+  TextField, IconButton, Tooltip, Autocomplete
 } from '@mui/material';
 import { Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import api from '../../utils/api';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
 
 const OrderManagement = () => {
   const [searchParams] = useSearchParams();
@@ -24,7 +29,22 @@ const OrderManagement = () => {
   // Status update dialog
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
+  const [newPaymentStatus, setNewPaymentStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Edit order dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editedOrder, setEditedOrder] = useState(null);
+  
+  // Delete/Cancel confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
+  
+  // Product management
+  const [products, setProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productQuantity, setProductQuantity] = useState(1);
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
   
   // Tab state
   const [tabValue, setTabValue] = useState(0);
@@ -42,6 +62,7 @@ const OrderManagement = () => {
     const orderIdParam = searchParams.get('orderId');
     
     fetchOrders(orderIdParam);
+    fetchProducts();
   }, [searchParams]);
   
   const fetchOrders = async (specificOrderId = null) => {
@@ -74,6 +95,15 @@ const OrderManagement = () => {
     }
   };
   
+  const fetchProducts = async () => {
+    try {
+      const response = await api.get('/products');
+      setProducts(response.data);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  };
+  
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
@@ -91,6 +121,7 @@ const OrderManagement = () => {
   const handleOpenStatusDialog = (order) => {
     setSelectedOrder(order);
     setNewStatus(order.order_status);
+    setNewPaymentStatus(order.payment_status);
     setStatusDialogOpen(true);
   };
   
@@ -98,10 +129,15 @@ const OrderManagement = () => {
     setStatusDialogOpen(false);
     setSelectedOrder(null);
     setNewStatus('');
+    setNewPaymentStatus('');
   };
   
   const handleStatusChange = (e) => {
     setNewStatus(e.target.value);
+  };
+  
+  const handlePaymentStatusChange = (e) => {
+    setNewPaymentStatus(e.target.value);
   };
   
   const handleUpdateStatus = async () => {
@@ -114,21 +150,222 @@ const OrderManagement = () => {
     try {
       const token = localStorage.getItem('token');
       await api.put(
-        `/admin/orders/${selectedOrder.id}/status`, 
-        { order_status: newStatus },
+        `/admin/orders/${selectedOrder.id}`, 
+        { 
+          order_status: newStatus,
+          payment_status: newPaymentStatus
+        },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
       );
       
-      setSuccess(`Order status updated to ${newStatus.toUpperCase()} successfully!`);
+      setSuccess(`Order updated successfully!`);
       fetchOrders();
       handleCloseStatusDialog();
     } catch (err) {
-      setError(`Failed to update order status: ${err.response?.data?.detail || err.message}`);
+      setError(`Failed to update order: ${err.response?.data?.detail || err.message}`);
     } finally {
       setIsSubmitting(false);
     }
+  };
+  
+  const handleOpenEditDialog = (order) => {
+    setEditedOrder({...order});
+    setEditDialogOpen(true);
+  };
+  
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setEditedOrder(null);
+  };
+  
+  const handleEditChange = (field, value) => {
+    setEditedOrder({...editedOrder, [field]: value});
+  };
+  
+  const handleSaveEdit = async () => {
+    if (!editedOrder) return;
+    
+    setIsSubmitting(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Format items for the API
+      const formattedItems = editedOrder.items.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price_at_purchase: item.price_at_purchase
+      }));
+      
+      await api.put(
+        `/admin/orders/${editedOrder.id}`,
+        {
+          delivery_address: editedOrder.delivery_address,
+          receiver_phone: editedOrder.receiver_phone,
+          order_status: editedOrder.order_status,
+          payment_status: editedOrder.payment_status,
+          items: formattedItems
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      setSuccess('Order updated successfully!');
+      fetchOrders();
+      handleCloseEditDialog();
+    } catch (err) {
+      setError(`Failed to update order: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleOpenDeleteDialog = (order) => {
+    setOrderToDelete(order);
+    setDeleteDialogOpen(true);
+  };
+  
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setOrderToDelete(null);
+  };
+  
+  const handleDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    
+    setIsSubmitting(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const token = localStorage.getItem('token');
+      await api.delete(
+        `/admin/orders/${orderToDelete.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      setSuccess('Order deleted successfully!');
+      fetchOrders();
+      handleCloseDeleteDialog();
+    } catch (err) {
+      setError(`Failed to delete order: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleCancelOrder = async () => {
+    if (!orderToDelete) return;
+    
+    setIsSubmitting(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const token = localStorage.getItem('token');
+      await api.put(
+        `/admin/orders/${orderToDelete.id}`,
+        {
+          order_status: 'cancelled'
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      setSuccess('Order cancelled successfully!');
+      fetchOrders();
+      handleCloseDeleteDialog();
+    } catch (err) {
+      setError(`Failed to cancel order: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleOpenProductDialog = () => {
+    setSelectedProduct(null);
+    setProductQuantity(1);
+    setProductDialogOpen(true);
+  };
+  
+  const handleCloseProductDialog = () => {
+    setProductDialogOpen(false);
+    setSelectedProduct(null);
+    setProductQuantity(1);
+  };
+  
+  const handleAddProduct = () => {
+    if (!selectedProduct || productQuantity < 1) return;
+    
+    const newItem = {
+      product_id: selectedProduct.id,
+      quantity: productQuantity,
+      price_at_purchase: selectedProduct.price,
+      product: selectedProduct
+    };
+    
+    // Add the product to the order
+    const updatedItems = [...editedOrder.items, newItem];
+    
+    // Update total amount
+    const newTotalAmount = updatedItems.reduce(
+      (sum, item) => sum + (item.price_at_purchase * item.quantity), 
+      0
+    );
+    
+    setEditedOrder({
+      ...editedOrder, 
+      items: updatedItems,
+      total_amount: newTotalAmount
+    });
+    
+    handleCloseProductDialog();
+  };
+  
+  const handleRemoveProduct = (indexToRemove) => {
+    const updatedItems = editedOrder.items.filter((_, index) => index !== indexToRemove);
+    
+    // Update total amount
+    const newTotalAmount = updatedItems.reduce(
+      (sum, item) => sum + (item.price_at_purchase * item.quantity), 
+      0
+    );
+    
+    setEditedOrder({
+      ...editedOrder, 
+      items: updatedItems,
+      total_amount: newTotalAmount
+    });
+  };
+  
+  const handleUpdateQuantity = (index, newQuantity) => {
+    if (newQuantity < 1) return;
+    
+    const updatedItems = [...editedOrder.items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      quantity: newQuantity
+    };
+    
+    // Update total amount
+    const newTotalAmount = updatedItems.reduce(
+      (sum, item) => sum + (item.price_at_purchase * item.quantity), 
+      0
+    );
+    
+    setEditedOrder({
+      ...editedOrder, 
+      items: updatedItems,
+      total_amount: newTotalAmount
+    });
   };
   
   const formatDate = (dateString) => {
@@ -146,6 +383,19 @@ const OrderManagement = () => {
       case 'delivered':
         return 'success';
       case 'cancelled':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+  
+  const getPaymentStatusColor = (status) => {
+    switch(status) {
+      case 'paid':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'failed':
         return 'error';
       default:
         return 'default';
@@ -211,10 +461,11 @@ const OrderManagement = () => {
               <TableRow>
                 <TableCell>Order ID</TableCell>
                 <TableCell>Date</TableCell>
-                <TableCell>Customer</TableCell>
+                <TableCell>Customer ID</TableCell>
                 <TableCell>Items</TableCell>
                 <TableCell align="right">Amount (₹)</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Payment</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -223,7 +474,7 @@ const OrderManagement = () => {
                 <TableRow key={order.id}>
                   <TableCell>#{order.id.substring(0, 8)}</TableCell>
                   <TableCell>{formatDate(order.order_date)}</TableCell>
-                  <TableCell>{order.customer_name}</TableCell>
+                  <TableCell>{order.user_id.substring(0, 8)}</TableCell>
                   <TableCell>{order.items.length} items</TableCell>
                   <TableCell align="right">{order.total_amount.toFixed(2)}</TableCell>
                   <TableCell>
@@ -236,13 +487,43 @@ const OrderManagement = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => handleViewOrder(order)}
-                    >
-                      View Details
-                    </Button>
+                    <Chip 
+                      label={order.payment_status.toUpperCase()} 
+                      color={getPaymentStatusColor(order.payment_status)} 
+                      size="small" 
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Box className="flex">
+                      <Tooltip title="View Details">
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleViewOrder(order)}
+                          className="mr-1"
+                        >
+                          View
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title="Edit Order">
+                        <IconButton 
+                          size="small" 
+                          color="primary"
+                          onClick={() => handleOpenEditDialog(order)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Order">
+                        <IconButton 
+                          size="small" 
+                          color="error"
+                          onClick={() => handleOpenDeleteDialog(order)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -265,15 +546,26 @@ const OrderManagement = () => {
                 <Typography variant="h6">
                   Order #{selectedOrder.id.substring(0, 8)}
                 </Typography>
-                <Chip 
-                  label={selectedOrder.order_status.toUpperCase()} 
-                  color={getStatusColor(selectedOrder.order_status)}
-                  className="cursor-pointer"
-                  onClick={() => {
-                    handleCloseViewDialog();
-                    handleOpenStatusDialog(selectedOrder);
-                  }}
-                />
+                <Box className="flex gap-2">
+                  <Chip 
+                    label={selectedOrder.payment_status.toUpperCase()} 
+                    color={getPaymentStatusColor(selectedOrder.payment_status)}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      handleCloseViewDialog();
+                      handleOpenStatusDialog(selectedOrder);
+                    }}
+                  />
+                  <Chip 
+                    label={selectedOrder.order_status.toUpperCase()} 
+                    color={getStatusColor(selectedOrder.order_status)}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      handleCloseViewDialog();
+                      handleOpenStatusDialog(selectedOrder);
+                    }}
+                  />
+                </Box>
               </Box>
             </DialogTitle>
             <DialogContent>
@@ -283,7 +575,7 @@ const OrderManagement = () => {
                     Order Items
                   </Typography>
                   {selectedOrder.items.map((item) => (
-                    <Card key={item.id} className="mb-3">
+                    <Card key={item.product_id} className="mb-3">
                       <Box className="flex">
                         <CardMedia
                           component="img"
@@ -324,10 +616,10 @@ const OrderManagement = () => {
                     </Box>
                     <Box className="mb-2">
                       <Typography variant="body2" color="textSecondary">
-                        Customer:
+                        Customer ID:
                       </Typography>
                       <Typography variant="body1">
-                        {selectedOrder.customer_name}
+                        {selectedOrder.user_id}
                       </Typography>
                     </Box>
                     <Box className="mb-2">
@@ -355,7 +647,7 @@ const OrderManagement = () => {
                       </Typography>
                       <Chip 
                         label={selectedOrder.payment_status.toUpperCase()} 
-                        color={selectedOrder.payment_status === 'paid' ? 'success' : 'warning'}
+                        color={getPaymentStatusColor(selectedOrder.payment_status)}
                         size="small"
                       />
                     </Box>
@@ -393,10 +685,10 @@ const OrderManagement = () => {
                 color="primary"
                 onClick={() => {
                   handleCloseViewDialog();
-                  handleOpenStatusDialog(selectedOrder);
+                  handleOpenEditDialog(selectedOrder);
                 }}
               >
-                Update Status
+                Edit Order
               </Button>
             </DialogActions>
           </>
@@ -406,22 +698,35 @@ const OrderManagement = () => {
       {/* Status Update Dialog */}
       <Dialog open={statusDialogOpen} onClose={handleCloseStatusDialog}>
         <DialogTitle>
-          Update Order Status
+          Update Order
         </DialogTitle>
         <DialogContent>
-          <Box className="pt-2">
+          <Box className="pt-2 space-y-4">
             <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
+              <InputLabel>Order Status</InputLabel>
               <Select
                 value={newStatus}
                 onChange={handleStatusChange}
-                label="Status"
+                label="Order Status"
               >
                 <MenuItem value="pending">Pending</MenuItem>
                 <MenuItem value="processing">Processing</MenuItem>
                 <MenuItem value="shipped">Shipped</MenuItem>
                 <MenuItem value="delivered">Delivered</MenuItem>
                 <MenuItem value="cancelled">Cancelled</MenuItem>
+              </Select>
+            </FormControl>
+            
+            <FormControl fullWidth>
+              <InputLabel>Payment Status</InputLabel>
+              <Select
+                value={newPaymentStatus}
+                onChange={handlePaymentStatusChange}
+                label="Payment Status"
+              >
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="paid">Paid</MenuItem>
+                <MenuItem value="failed">Failed</MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -440,8 +745,342 @@ const OrderManagement = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      
+      {/* Edit Order Dialog */}
+      <Dialog open={editDialogOpen} onClose={handleCloseEditDialog} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Edit Order #{editedOrder?.id?.substring(0, 8)}
+        </DialogTitle>
+        <DialogContent>
+          {editedOrder && (
+            <Box className="pt-2">
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Delivery Address"
+                    multiline
+                    rows={3}
+                    value={editedOrder.delivery_address || ''}
+                    onChange={(e) => handleEditChange('delivery_address', e.target.value)}
+                    margin="normal"
+                  />
+                </Grid>
+                
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Phone Number"
+                    value={editedOrder.receiver_phone || ''}
+                    onChange={(e) => handleEditChange('receiver_phone', e.target.value)}
+                    margin="normal"
+                  />
+                  
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>Order Status</InputLabel>
+                    <Select
+                      value={editedOrder.order_status}
+                      onChange={(e) => handleEditChange('order_status', e.target.value)}
+                      label="Order Status"
+                    >
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="processing">Processing</MenuItem>
+                      <MenuItem value="shipped">Shipped</MenuItem>
+                      <MenuItem value="delivered">Delivered</MenuItem>
+                      <MenuItem value="cancelled">Cancelled</MenuItem>
+                    </Select>
+                  </FormControl>
+                  
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>Payment Status</InputLabel>
+                    <Select
+                      value={editedOrder.payment_status}
+                      onChange={(e) => handleEditChange('payment_status', e.target.value)}
+                      label="Payment Status"
+                    >
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="paid">Paid</MenuItem>
+                      <MenuItem value="failed">Failed</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Divider className="mb-3">
+                    <Chip label="Order Items" />
+                  </Divider>
+                  
+                  <Box display="flex" justifyContent="flex-end" mb={2}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<AddIcon />}
+                      onClick={handleOpenProductDialog}
+                    >
+                      Add Product
+                    </Button>
+                  </Box>
+                  
+                  {editedOrder.items.length === 0 ? (
+                    <Paper className="p-4 text-center">
+                      <Typography variant="body1" color="textSecondary">
+                        No products in this order. Add some products.
+                      </Typography>
+                    </Paper>
+                  ) : (
+                    <TableContainer component={Paper}>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Product</TableCell>
+                            <TableCell>Price (₹)</TableCell>
+                            <TableCell>Quantity</TableCell>
+                            <TableCell align="right">Total (₹)</TableCell>
+                            <TableCell>Action</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {editedOrder.items.map((item, index) => (
+                            <TableRow key={`${item.product_id}-${index}`}>
+                              <TableCell>
+                                <Box className="flex items-center">
+                                  <img 
+                                    src={item.product.image_url} 
+                                    alt={item.product.name}
+                                    className="w-12 h-12 object-cover mr-2"
+                                  />
+                                  <Typography variant="body2">
+                                    {item.product.name}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                {item.price_at_purchase.toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <Box className="flex items-center">
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={() => handleUpdateQuantity(index, item.quantity - 1)}
+                                    disabled={item.quantity <= 1}
+                                  >
+                                    <RemoveIcon fontSize="small" />
+                                  </IconButton>
+                                  <TextField
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const value = parseInt(e.target.value);
+                                      if (!isNaN(value) && value > 0) {
+                                        handleUpdateQuantity(index, value);
+                                      }
+                                    }}
+                                    inputProps={{ 
+                                      min: 1,
+                                      style: { textAlign: 'center' }
+                                    }}
+                                    variant="outlined"
+                                    size="small"
+                                    sx={{ width: 60, mx: 1 }}
+                                  />
+                                  <IconButton 
+                                    size="small"
+                                    onClick={() => handleUpdateQuantity(index, item.quantity + 1)}
+                                  >
+                                    <AddIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              </TableCell>
+                              <TableCell align="right">
+                                {(item.price_at_purchase * item.quantity).toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <IconButton
+                                  color="error"
+                                  size="small"
+                                  onClick={() => handleRemoveProduct(index)}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow>
+                            <TableCell colSpan={3} align="right">
+                              <Typography variant="subtitle1">
+                                Total Amount:
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="subtitle1" color="primary">
+                              ₹{editedOrder.total_amount.toFixed(2)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell />
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSaveEdit} 
+            variant="contained" 
+            color="primary"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <CircularProgress size={24} /> : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Delete/Cancel Order Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
+        <DialogTitle>
+          Order Action
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            What would you like to do with this order?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCancelOrder} 
+            variant="outlined" 
+            color="warning"
+            disabled={isSubmitting || orderToDelete?.order_status === 'cancelled'}
+          >
+            Mark as Cancelled
+          </Button>
+          <Button 
+            onClick={handleDeleteOrder} 
+            variant="contained" 
+            color="error"
+            disabled={isSubmitting}
+          >
+            Delete Order
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Add Product Dialog */}
+      <Dialog open={productDialogOpen} onClose={handleCloseProductDialog}>
+        <DialogTitle>
+          Add Product to Order
+        </DialogTitle>
+        <DialogContent>
+          <Box className="pt-2 space-y-4">
+            <Autocomplete
+              options={products}
+              getOptionLabel={(product) => product.name}
+              onChange={(_, newValue) => {
+                setSelectedProduct(newValue);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Select Product"
+                  fullWidth
+                  variant="outlined"
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props} className="flex items-center p-2">
+                  <img 
+                    src={option.image_url} 
+                    alt={option.name}
+                    className="w-10 h-10 object-cover mr-2"
+                  />
+                  <Box>
+                    <Typography variant="body1">{option.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      ₹{option.price.toFixed(2)}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            />
+            
+            {selectedProduct && (
+              <>
+                <Box className="flex items-center justify-between">
+                  <Typography>Price:</Typography>
+                  <Typography>₹{selectedProduct.price.toFixed(2)}</Typography>
+                </Box>
+                
+                <Box className="flex items-center justify-between">
+                  <Typography>Quantity:</Typography>
+                  <Box className="flex items-center">
+                    <IconButton 
+                      size="small" 
+                      onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))}
+                      disabled={productQuantity <= 1}
+                    >
+                      <RemoveIcon fontSize="small" />
+                    </IconButton>
+                    <TextField
+                      value={productQuantity}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (!isNaN(value) && value > 0) {
+                          setProductQuantity(value);
+                        }
+                      }}
+                      inputProps={{ 
+                        min: 1,
+                        style: { textAlign: 'center' }
+                      }}
+                      variant="outlined"
+                      size="small"
+                      sx={{ width: 60, mx: 1 }}
+                    />
+                    <IconButton 
+                      size="small"
+                      onClick={() => setProductQuantity(productQuantity + 1)}
+                    >
+                      <AddIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </Box>
+                
+                <Box className="flex items-center justify-between">
+                  <Typography variant="subtitle1">Total:</Typography>
+                  <Typography variant="subtitle1" color="primary">
+                    ₹{(selectedProduct.price * productQuantity).toFixed(2)}
+                  </Typography>
+                </Box>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseProductDialog}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAddProduct} 
+            variant="contained" 
+            color="primary"
+            disabled={!selectedProduct}
+          >
+            Add Product
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
 
 export default OrderManagement;
+

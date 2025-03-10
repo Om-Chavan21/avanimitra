@@ -137,9 +137,18 @@ class OrderResponse(BaseModel):
     payment_status: PaymentStatus
 
 
+class OrderItem(BaseModel):
+    product_id: str
+    quantity: int
+    price_at_purchase: float
+
+
 class OrderUpdate(BaseModel):
-    order_status: Optional[OrderStatus] = None
-    payment_status: Optional[PaymentStatus] = None
+    order_status: Optional[str] = None
+    payment_status: Optional[str] = None
+    delivery_address: Optional[str] = None
+    receiver_phone: Optional[str] = None
+    items: Optional[List[OrderItem]] = None
 
 
 class AdminOrderCreate(BaseModel):
