@@ -5,12 +5,14 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, CircularProgress, Autocomplete, InputAdornment,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert,
-  FormControl, InputLabel, Select, MenuItem
+  FormControl, InputLabel, Select, MenuItem, Divider
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import api from '../../utils/api';
+import PasswordField from '../../components/PasswordField';
 
 const CustomOrder = () => {
   const navigate = useNavigate();
@@ -20,7 +22,7 @@ const CustomOrder = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   // Order data
   const [selectedUser, setSelectedUser] = useState(null);
   const [orderDetails, setOrderDetails] = useState({
@@ -31,30 +33,44 @@ const CustomOrder = () => {
   });
   const [orderItems, setOrderItems] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
-  
+
   // Product selection dialog
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  
+
+  // New user dialog
+  const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    password: 'password' // Default password
+  });
+  const [newUserErrors, setNewUserErrors] = useState({});
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        
         // Fetch users
         const usersResponse = await api.get('/admin/users', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
         // Only regular users, not admins
         const regularUsers = usersResponse.data.filter(user => !user.is_admin);
         setUsers(regularUsers);
-        
+
         // Fetch active products
-        const productsResponse = await api.get('/products');
-        setProducts(productsResponse.data);
+        const productsResponse = await api.get('/admin/products', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        // Only active products with stock
+        const activeProducts = productsResponse.data.filter(
+          product => product.status === 'active' && product.stock_quantity > 0
+        );
+        setProducts(activeProducts);
       } catch (err) {
         setError('Failed to fetch required data');
         console.error('Error fetching data:', err);
@@ -62,16 +78,16 @@ const CustomOrder = () => {
         setLoading(false);
       }
     };
-    
+
     fetchData();
   }, []);
-  
+
   // Calculate total amount when order items change
   useEffect(() => {
     const newTotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     setTotalAmount(newTotal);
   }, [orderItems]);
-  
+
   // Update delivery details when user changes
   useEffect(() => {
     if (selectedUser) {
@@ -82,11 +98,11 @@ const CustomOrder = () => {
       });
     }
   }, [selectedUser]);
-  
+
   const handleUserChange = (event, newValue) => {
     setSelectedUser(newValue);
   };
-  
+
   const handleOrderDetailsChange = (e) => {
     const { name, value } = e.target;
     setOrderDetails({
@@ -94,34 +110,34 @@ const CustomOrder = () => {
       [name]: value
     });
   };
-  
+
   const handleOpenProductDialog = () => {
     setSelectedProduct(null);
     setSelectedQuantity(1);
     setProductDialogOpen(true);
   };
-  
+
   const handleCloseProductDialog = () => {
     setProductDialogOpen(false);
   };
-  
+
   const handleProductSelection = (event, newValue) => {
     setSelectedProduct(newValue);
   };
-  
+
   const handleQuantityChange = (value) => {
     if (value < 1) return;
     setSelectedQuantity(value);
   };
-  
+
   const handleAddProductToOrder = () => {
     if (!selectedProduct) return;
-    
+
     // Check if product already exists in order
     const existingItemIndex = orderItems.findIndex(
       item => item.product_id === selectedProduct.id
     );
-    
+
     if (existingItemIndex >= 0) {
       // Update quantity if product already exists
       const updatedItems = [...orderItems];
@@ -139,48 +155,53 @@ const CustomOrder = () => {
         }
       ]);
     }
-    
     handleCloseProductDialog();
   };
-  
+
   const handleUpdateItemQuantity = (index, newQuantity) => {
     if (newQuantity < 1) return;
+    
+    const product = orderItems[index].product;
+    if (newQuantity > product.stock_quantity) {
+      setError(`Cannot add more than ${product.stock_quantity} units of ${product.name}`);
+      return;
+    }
     
     const updatedItems = [...orderItems];
     updatedItems[index].quantity = newQuantity;
     setOrderItems(updatedItems);
   };
-  
+
   const handleRemoveItem = (index) => {
     const updatedItems = [...orderItems];
     updatedItems.splice(index, 1);
     setOrderItems(updatedItems);
   };
-  
+
   const validateOrder = () => {
     if (!selectedUser) {
       setError('Please select a customer');
       return false;
     }
-    
+
     if (!orderDetails.delivery_address) {
       setError('Delivery address is required');
       return false;
     }
-    
+
     if (!orderDetails.receiver_phone) {
       setError('Receiver phone is required');
       return false;
     }
-    
+
     if (orderItems.length === 0) {
       setError('Please add at least one product to the order');
       return false;
     }
-    
+
     return true;
   };
-  
+
   const handleSubmitOrder = async () => {
     if (!validateOrder()) return;
     
@@ -188,7 +209,7 @@ const CustomOrder = () => {
       setSubmitting(true);
       setError('');
       setSuccess('');
-      
+
       const token = localStorage.getItem('token');
       await api.post(
         '/admin/orders',
@@ -208,7 +229,7 @@ const CustomOrder = () => {
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-      
+
       setSuccess('Order created successfully!');
       
       // Reset form after successful submission
@@ -217,6 +238,89 @@ const CustomOrder = () => {
       }, 2000);
     } catch (err) {
       setError(`Failed to create order: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // New user dialog functions
+  const handleOpenNewUserDialog = () => {
+    setNewUser({
+      name: '',
+      phone: '',
+      address: '',
+      password: 'password' // Default password
+    });
+    setNewUserErrors({});
+    setNewUserDialogOpen(true);
+  };
+
+  const handleCloseNewUserDialog = () => {
+    setNewUserDialogOpen(false);
+  };
+
+  const handleNewUserChange = (e) => {
+    const { name, value } = e.target;
+    setNewUser({
+      ...newUser,
+      [name]: value
+    });
+    
+    // Clear error for this field
+    if (newUserErrors[name]) {
+      setNewUserErrors({
+        ...newUserErrors,
+        [name]: ''
+      });
+    }
+  };
+
+  const validateNewUser = () => {
+    const errors = {};
+    
+    if (!newUser.name.trim()) {
+      errors.name = 'Name is required';
+    }
+    
+    if (!newUser.phone.trim()) {
+      errors.phone = 'Phone number is required';
+    } else if (!/^\d{10}$/.test(newUser.phone)) {
+      errors.phone = 'Phone number must be 10 digits';
+    }
+    
+    if (!newUser.address.trim()) {
+      errors.address = 'Address is required';
+    }
+    
+    setNewUserErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCreateNewUser = async () => {
+    if (!validateNewUser()) return;
+    
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('token');
+      
+      const response = await api.post(
+        '/admin/users',
+        newUser,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      // Add new user to the users list and select it
+      const newCreatedUser = response.data;
+      setUsers([...users, newCreatedUser]);
+      setSelectedUser(newCreatedUser);
+      
+      // Close dialog
+      handleCloseNewUserDialog();
+      setSuccess('New customer created successfully!');
+    } catch (err) {
+      setError(`Failed to create user: ${err.response?.data?.detail || err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -237,26 +341,26 @@ const CustomOrder = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Create Custom Order
       </Typography>
-      
+
       {error && (
         <Alert severity="error" className="mb-4" onClose={() => setError('')}>
           {error}
         </Alert>
       )}
-      
+
       {success && (
         <Alert severity="success" className="mb-4" onClose={() => setSuccess('')}>
           {success}
         </Alert>
       )}
-      
+
       <Grid container spacing={4}>
         <Grid item xs={12} md={8}>
           <Paper className="p-4 mb-4">
             <Typography variant="h6" gutterBottom>
               Order Items
             </Typography>
-            
+
             {orderItems.length === 0 ? (
               <Box className="text-center py-6">
                 <Typography variant="body1" color="textSecondary" gutterBottom>
@@ -293,9 +397,14 @@ const CustomOrder = () => {
                                 alt={item.product.name}
                                 className="w-12 h-12 object-cover mr-2"
                               />
-                              <Typography variant="body2">
-                                {item.product.name}
-                              </Typography>
+                              <Box>
+                                <Typography variant="body2">
+                                  {item.product.name}
+                                </Typography>
+                                <Typography variant="caption" color="textSecondary">
+                                  Stock: {item.product.stock_quantity}
+                                </Typography>
+                              </Box>
                             </Box>
                           </TableCell>
                           <TableCell align="right">
@@ -339,7 +448,6 @@ const CustomOrder = () => {
                     </TableBody>
                   </Table>
                 </TableContainer>
-                
                 <Box className="mt-4 flex justify-between">
                   <Button
                     variant="outlined"
@@ -355,7 +463,7 @@ const CustomOrder = () => {
               </>
             )}
           </Paper>
-          
+
           <Paper className="p-4">
             <Typography variant="h6" gutterBottom>
               Order Status
@@ -394,13 +502,21 @@ const CustomOrder = () => {
             </Grid>
           </Paper>
         </Grid>
-        
+
         <Grid item xs={12} md={4}>
           <Paper className="p-4 mb-4">
-            <Typography variant="h6" gutterBottom>
-              Customer Information
-            </Typography>
-            
+            <Box className="flex justify-between items-center mb-4">
+              <Typography variant="h6" gutterBottom>
+                Customer Information
+              </Typography>
+              <Button
+                startIcon={<PersonAddIcon />}
+                onClick={handleOpenNewUserDialog}
+                size="small"
+              >
+                New Customer
+              </Button>
+            </Box>
             <Autocomplete
               id="customer-select"
               options={users}
@@ -417,12 +533,11 @@ const CustomOrder = () => {
               )}
             />
           </Paper>
-          
+
           <Paper className="p-4">
             <Typography variant="h6" gutterBottom>
               Delivery Details
             </Typography>
-            
             <TextField
               name="delivery_address"
               label="Delivery Address"
@@ -434,7 +549,6 @@ const CustomOrder = () => {
               rows={3}
               required
             />
-            
             <TextField
               name="receiver_phone"
               label="Receiver's Phone"
@@ -447,7 +561,6 @@ const CustomOrder = () => {
               }}
               required
             />
-            
             <Button
               variant="contained"
               color="primary"
@@ -462,14 +575,14 @@ const CustomOrder = () => {
           </Paper>
         </Grid>
       </Grid>
-      
+
       {/* Add Product Dialog */}
       <Dialog open={productDialogOpen} onClose={handleCloseProductDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Add Product to Order</DialogTitle>
         <DialogContent>
           <Autocomplete
             id="product-select"
-            options={products.filter(product => product.status === 'active')}
+            options={products.filter(product => product.status === 'active' && product.stock_quantity > 0)}
             getOptionLabel={(option) => option.name}
             value={selectedProduct}
             onChange={handleProductSelection}
@@ -492,18 +605,18 @@ const CustomOrder = () => {
                   <Box>
                     <Typography variant="body1">{option.name}</Typography>
                     <Typography variant="body2" color="textSecondary">
-                      ₹{option.price.toFixed(2)} - Stock: {option.stock_quantity}
+                      ₹{option.price.toFixed(2)} - Stock: {option.stock_quantity} - {option.category}
                     </Typography>
                   </Box>
                 </Box>
               </Box>
             )}
           />
-          
+
           {selectedProduct && (
             <Box className="mt-4">
               <Typography variant="subtitle2" gutterBottom>
-                Quantity:
+                Quantity: (Available: {selectedProduct.stock_quantity})
               </Typography>
               <Box className="flex items-center">
                 <IconButton 
@@ -516,23 +629,27 @@ const CustomOrder = () => {
                   value={selectedQuantity}
                   onChange={(e) => {
                     const value = parseInt(e.target.value);
-                    if (!isNaN(value) && value > 0) {
+                    if (!isNaN(value) && value > 0 && value <= selectedProduct.stock_quantity) {
                       handleQuantityChange(value);
                     }
                   }}
                   size="small"
                   type="number"
-                  InputProps={{ inputProps: { min: 1 } }}
+                  InputProps={{ 
+                    inputProps: { 
+                      min: 1, 
+                      max: selectedProduct.stock_quantity 
+                    } 
+                  }}
                   sx={{ width: 60, mx: 1 }}
                 />
                 <IconButton 
                   size="small"
-                  onClick={() => handleQuantityChange(selectedQuantity + 1)}
+                  onClick={() => handleQuantityChange(Math.min(selectedQuantity + 1, selectedProduct.stock_quantity))}
                 >
                   <AddIcon />
                 </IconButton>
               </Box>
-              
               <Box className="mt-4 flex justify-between">
                 <Typography>
                   Price: ₹{selectedProduct.price.toFixed(2)}
@@ -555,6 +672,75 @@ const CustomOrder = () => {
             disabled={!selectedProduct}
           >
             Add to Order
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* New Customer Dialog */}
+      <Dialog open={newUserDialogOpen} onClose={handleCloseNewUserDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Create New Customer</DialogTitle>
+        <DialogContent>
+          <Box className="pt-2">
+            <TextField
+              name="name"
+              label="Full Name"
+              fullWidth
+              margin="normal"
+              value={newUser.name}
+              onChange={handleNewUserChange}
+              error={!!newUserErrors.name}
+              helperText={newUserErrors.name}
+              required
+            />
+            
+            <TextField
+              name="phone"
+              label="Phone Number"
+              fullWidth
+              margin="normal"
+              value={newUser.phone}
+              onChange={handleNewUserChange}
+              error={!!newUserErrors.phone}
+              helperText={newUserErrors.phone}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">+91</InputAdornment>,
+              }}
+              inputProps={{ maxLength: 10 }}
+              required
+            />
+            
+            <TextField
+              name="address"
+              label="Address"
+              fullWidth
+              margin="normal"
+              multiline
+              rows={2}
+              value={newUser.address}
+              onChange={handleNewUserChange}
+              error={!!newUserErrors.address}
+              helperText={newUserErrors.address}
+              required
+            />
+            
+            <Box mt={2}>
+              <Typography variant="body2" color="textSecondary" gutterBottom>
+                Note: A default password "password" will be set for this customer.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseNewUserDialog} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCreateNewUser} 
+            variant="contained" 
+            color="primary"
+            disabled={submitting}
+          >
+            {submitting ? <CircularProgress size={24} /> : 'Create Customer'}
           </Button>
         </DialogActions>
       </Dialog>

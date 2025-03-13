@@ -61,6 +61,9 @@ class ProductBase(BaseModel):
     description: str
     price: float
     image_url: str
+    category: str
+    stock_quantity: int
+    status: str
 
 
 class ProductCreate(ProductBase):
@@ -72,6 +75,9 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     price: Optional[float] = None
     image_url: Optional[str] = None
+    category: Optional[str] = None
+    stock_quantity: Optional[int] = None
+    status: Optional[str] = None
 
 
 class ProductResponse(ProductBase):

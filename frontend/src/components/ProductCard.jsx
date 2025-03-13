@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Card, CardContent, CardMedia, Typography, Button, 
   Dialog, DialogActions, DialogContent, DialogTitle,
-  Box, IconButton, TextField
+  Box, IconButton, TextField, Chip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -19,11 +19,11 @@ const ProductCard = ({ product }) => {
   
   const isInCart = cart?.items?.some(item => item.product_id === product.id);
   const cartItem = cart?.items?.find(item => item.product_id === product.id);
-
+  
   const handleOpen = () => {
     setOpen(true);
   };
-
+  
   const handleClose = () => {
     setOpen(false);
     // Reset quantity when dialog closes
@@ -31,7 +31,7 @@ const ProductCard = ({ product }) => {
       setQuantity(1);
     }
   };
-
+  
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -41,7 +41,7 @@ const ProductCard = ({ product }) => {
     await addToCart(product.id, quantity);
     handleClose();
   };
-
+  
   const handleQuantityChange = async (newQuantity) => {
     if (newQuantity < 1) return;
     
@@ -66,18 +66,34 @@ const ProductCard = ({ product }) => {
           className="h-48 object-cover"
         />
         <CardContent className="flex-grow">
-          <Typography gutterBottom variant="h6" component="div">
-            {product.name}
-          </Typography>
+          <Box className="flex justify-between items-start">
+            <Typography gutterBottom variant="h6" component="div">
+              {product.name}
+            </Typography>
+            <Chip
+              label={product.category}
+              size="small"
+              color="primary"
+              variant="outlined"
+              className="ml-1"
+            />
+          </Box>
           <Typography variant="body2" color="text.secondary" className="line-clamp-3">
             {product.description}
           </Typography>
-          <Typography variant="h6" color="primary" className="mt-2">
-            ₹{product.price.toFixed(2)}
-          </Typography>
+          <Box className="flex justify-between items-center mt-2">
+            <Typography variant="h6" color="primary">
+              ₹{product.price.toFixed(2)}
+            </Typography>
+            {product.stock_quantity <= 10 && product.stock_quantity > 0 && (
+              <Typography variant="caption" color="error">
+                Only {product.stock_quantity} left
+              </Typography>
+            )}
+          </Box>
         </CardContent>
       </Card>
-
+      
       <Dialog open={open} onClose={handleClose}>
         <DialogTitle>{product.name}</DialogTitle>
         <DialogContent>
@@ -90,36 +106,62 @@ const ProductCard = ({ product }) => {
               />
             </Box>
             <Box className="w-full md:w-1/2">
+              <Box className="flex justify-between items-center mb-2">
+                <Chip
+                  label={product.category}
+                  color="primary"
+                  size="small"
+                />
+                {product.status && (
+                  <Chip
+                    label={product.status.toUpperCase()}
+                    color={product.status === 'active' ? 'success' : 'default'}
+                    size="small"
+                  />
+                )}
+              </Box>
               <Typography variant="body1" paragraph>
                 {product.description}
               </Typography>
               <Typography variant="h5" color="primary" gutterBottom>
                 ₹{product.price.toFixed(2)}
               </Typography>
-              <Box className="flex items-center mt-4">
-                <IconButton 
-                  color="primary"
-                  onClick={() => handleQuantityChange(isInCart ? cartItem.quantity - 1 : quantity - 1)}
-                  disabled={isInCart ? cartItem.quantity <= 1 : quantity <= 1}
-                >
-                  <RemoveIcon />
-                </IconButton>
-                <TextField
-                  variant="outlined"
-                  size="small"
-                  value={isInCart ? cartItem.quantity : quantity}
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                  sx={{ width: '60px', mx: 1 }}
-                />
-                <IconButton 
-                  color="primary"
-                  onClick={() => handleQuantityChange(isInCart ? cartItem.quantity + 1 : quantity + 1)}
-                >
-                  <AddIcon />
-                </IconButton>
-              </Box>
+              {product.stock_quantity > 0 ? (
+                <>
+                  <Typography variant="body2" color={product.stock_quantity <= 10 ? "error" : "textSecondary"}>
+                    In stock: {product.stock_quantity} units
+                  </Typography>
+                  <Box className="flex items-center mt-4">
+                    <IconButton 
+                      color="primary"
+                      onClick={() => handleQuantityChange(isInCart ? cartItem.quantity - 1 : quantity - 1)}
+                      disabled={isInCart ? cartItem.quantity <= 1 : quantity <= 1}
+                    >
+                      <RemoveIcon />
+                    </IconButton>
+                    <TextField
+                      variant="outlined"
+                      size="small"
+                      value={isInCart ? cartItem.quantity : quantity}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                      sx={{ width: '60px', mx: 1 }}
+                    />
+                    <IconButton 
+                      color="primary"
+                      onClick={() => handleQuantityChange(isInCart ? cartItem.quantity + 1 : quantity + 1)}
+                      disabled={(isInCart ? cartItem.quantity : quantity) >= product.stock_quantity}
+                    >
+                      <AddIcon />
+                    </IconButton>
+                  </Box>
+                </>
+              ) : (
+                <Typography variant="body2" color="error" className="mt-2">
+                  Out of stock
+                </Typography>
+              )}
             </Box>
           </Box>
         </DialogContent>
@@ -130,6 +172,7 @@ const ProductCard = ({ product }) => {
               onClick={handleAddToCart} 
               variant="contained" 
               color="primary"
+              disabled={product.stock_quantity === 0}
             >
               Add to Cart
             </Button>

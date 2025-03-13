@@ -1,5 +1,6 @@
 farm-stack-course/venv
 .env
+prompt.txt
 
 node_modules/
 __pycache__/

@@ -58,6 +58,25 @@ async def create_order(
                 detail=f"Product with id {item.product_id} not found",
             )
 
+        # Check if product is active and has sufficient stock
+        if product.get("status", "active") != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Product '{product['name']}' is not available for purchase",
+            )
+
+        if item.quantity > product.get("stock_quantity", 0):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Insufficient stock for '{product['name']}'. Available: {product.get('stock_quantity', 0)}",
+            )
+
+        # Update product stock
+        await products_collection.update_one(
+            {"_id": ObjectId(item.product_id)},
+            {"$inc": {"stock_quantity": -item.quantity}},
+        )
+
         product = serialize_doc_id(product)
 
         # Add item to order
@@ -82,7 +101,6 @@ async def create_order(
 
     # Format response
     order_response = await get_order_with_products(order["id"])
-
     return order_response
 
 
