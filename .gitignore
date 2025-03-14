@@ -5,6 +5,7 @@ prompt.txt
 node_modules/
 __pycache__/
 **/__pycache__/
+.DS_Store/
 
 *.pyc
 # Local Netlify folder
