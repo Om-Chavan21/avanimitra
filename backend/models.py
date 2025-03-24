@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, EmailStr, validator
 import re
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
@@ -125,6 +125,7 @@ class OrderCreate(BaseModel):
     delivery_address: str
     receiver_phone: str
     items: List[CartItem]
+    payment_method: Optional[str] = None
 
 
 class OrderItemResponse(OrderItemBase):
@@ -164,3 +165,32 @@ class AdminOrderCreate(BaseModel):
     items: List[OrderItemBase]
     order_status: OrderStatus = OrderStatus.PENDING
     payment_status: PaymentStatus = PaymentStatus.PENDING
+    discount_type: Optional[str] = None
+    discount_value: Optional[float] = None
+    total_amount: Optional[float] = None
+
+
+class PaymentSettingsBase(BaseModel):
+    bank_name: str
+    account_holder: str
+    account_number: str
+    ifsc_code: str
+    upi_id: str
+    gpay_number: str
+
+
+class PaymentSettingsUpdate(PaymentSettingsBase):
+    pass
+
+
+class PaymentSettingsResponse(PaymentSettingsBase):
+    id: Optional[str] = None
+
+
+class OrderExportRequest(BaseModel):
+    format: str  # excel, csv, google_sheets
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    email: str
+    include_all_fields: bool = True
+    status_filter: str = "all"  # all, pending, processing, shipped, delivered, cancelled

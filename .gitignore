@@ -1,6 +1,5 @@
 farm-stack-course/venv
 .env
-prompt.txt
 
 node_modules/
 __pycache__/
@@ -9,3 +8,8 @@ __pycache__/
 *.pyc
 # Local Netlify folder
 .netlify
+
+prompt.txt
+commands.txt
+tasks.txt
+file_contents.txt

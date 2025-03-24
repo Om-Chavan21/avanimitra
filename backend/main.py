@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, products, cart, orders
+from routers import auth, products, cart, orders, payment_settings
 import uvicorn
 import requests
 import time
@@ -26,6 +26,7 @@ app.include_router(auth.router, prefix="", tags=["auth"])
 app.include_router(products.router, prefix="", tags=["products"])
 app.include_router(cart.router, prefix="", tags=["cart"])
 app.include_router(orders.router, prefix="", tags=["orders"])
+app.include_router(payment_settings.router, prefix="", tags=["payment"])
 
 
 # GET route at the root URL

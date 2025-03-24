@@ -3,7 +3,8 @@ import {
   Container, Typography, Box, Paper, Button, TextField, Grid,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
-  CircularProgress, FormControl, InputLabel, Select, MenuItem, Alert
+  CircularProgress, FormControl, InputLabel, Select, MenuItem, Alert,
+  Card, CardMedia
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -75,13 +76,10 @@ const ProductManagement = () => {
         name: product.name,
         description: product.description,
         price: product.price.toString(),
-        // stock_quantity: product.stock_quantity.toString(),
-        stock_quantity: '',
-        // category: product.category,
-        category: '',
+        stock_quantity: product.stock_quantity.toString(),
+        category: product.category,
         image_url: product.image_url,
-        // status: product.status
-        status: ''
+        status: product.status
       });
     } else {
       setFormData({
@@ -263,6 +261,10 @@ const ProductManagement = () => {
                       src={product.image_url} 
                       alt={product.name} 
                       className="w-16 h-16 object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "https://via.placeholder.com/150?text=Image+Error";
+                      }}
                     />
                   </TableCell>
                   <TableCell>{product.name}</TableCell>
@@ -317,10 +319,11 @@ const ProductManagement = () => {
                 onChange={handleInputChange}
                 error={!!formErrors.name}
                 helperText={formErrors.name}
+                required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth error={!!formErrors.category}>
+              <FormControl fullWidth error={!!formErrors.category} required>
                 <InputLabel>Category</InputLabel>
                 <Select
                   name="category"
@@ -353,6 +356,7 @@ const ProductManagement = () => {
                 onChange={handleInputChange}
                 error={!!formErrors.description}
                 helperText={formErrors.description}
+                required
               />
             </Grid>
             
@@ -367,6 +371,7 @@ const ProductManagement = () => {
                 error={!!formErrors.price}
                 helperText={formErrors.price}
                 inputProps={{ min: 0, step: 0.01 }}
+                required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -380,6 +385,7 @@ const ProductManagement = () => {
                 error={!!formErrors.stock_quantity}
                 helperText={formErrors.stock_quantity}
                 inputProps={{ min: 0, step: 1 }}
+                required
               />
             </Grid>
             
@@ -392,10 +398,11 @@ const ProductManagement = () => {
                 onChange={handleInputChange}
                 error={!!formErrors.image_url}
                 helperText={formErrors.image_url}
+                required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth error={!!formErrors.status}>
+              <FormControl fullWidth error={!!formErrors.status} required>
                 <InputLabel>Status</InputLabel>
                 <Select
                   name="status"
@@ -422,9 +429,10 @@ const ProductManagement = () => {
                 <Typography variant="subtitle2" gutterBottom>
                   Image Preview
                 </Typography>
-                <Box className="w-full h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
-                  <img 
-                    src={formData.image_url}
+                <Card className="w-full h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+                  <CardMedia
+                    component="img" 
+                    image={formData.image_url}
                     alt="Product preview" 
                     className="max-h-full object-contain"
                     onError={(e) => {
@@ -432,7 +440,7 @@ const ProductManagement = () => {
                       e.target.src = "https://via.placeholder.com/400x300?text=Invalid+Image+URL";
                     }}
                   />
-                </Box>
+                </Card>
               </Grid>
             )}
           </Grid>

@@ -5,12 +5,13 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, CircularProgress, Autocomplete, InputAdornment,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert,
-  FormControl, InputLabel, Select, MenuItem, Divider
+  FormControl, InputLabel, Select, MenuItem, Divider, Switch, FormControlLabel
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import PercentIcon from '@mui/icons-material/Percent';
 import api from '../../utils/api';
 import PasswordField from '../../components/PasswordField';
 
@@ -33,11 +34,18 @@ const CustomOrder = () => {
   });
   const [orderItems, setOrderItems] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
-
+  
+  // Custom rate fields
+  const [discountType, setDiscountType] = useState('none'); // none, order, item
+  const [orderDiscount, setOrderDiscount] = useState(0);
+  const [orderDiscountType, setOrderDiscountType] = useState('percentage'); // percentage, fixed
+  
   // Product selection dialog
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [customItemRate, setCustomItemRate] = useState(0);
+  const [useCustomItemRate, setUseCustomItemRate] = useState(false);
 
   // New user dialog
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
@@ -82,11 +90,26 @@ const CustomOrder = () => {
     fetchData();
   }, []);
 
-  // Calculate total amount when order items change
+  // Calculate total amount when order items change or when discount changes
   useEffect(() => {
-    const newTotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    setTotalAmount(newTotal);
-  }, [orderItems]);
+    // Calculate base total
+    const baseTotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // Apply discounts
+    if (discountType === 'order' && orderDiscount > 0) {
+      if (orderDiscountType === 'percentage') {
+        // Percentage discount
+        const discountAmount = baseTotal * (orderDiscount / 100);
+        setTotalAmount(baseTotal - discountAmount);
+      } else {
+        // Fixed amount discount
+        setTotalAmount(Math.max(0, baseTotal - orderDiscount));
+      }
+    } else {
+      // No discount or item-level discounts are already included in item prices
+      setTotalAmount(baseTotal);
+    }
+  }, [orderItems, discountType, orderDiscount, orderDiscountType]);
 
   // Update delivery details when user changes
   useEffect(() => {
@@ -114,6 +137,8 @@ const CustomOrder = () => {
   const handleOpenProductDialog = () => {
     setSelectedProduct(null);
     setSelectedQuantity(1);
+    setCustomItemRate(0);
+    setUseCustomItemRate(false);
     setProductDialogOpen(true);
   };
 
@@ -123,6 +148,9 @@ const CustomOrder = () => {
 
   const handleProductSelection = (event, newValue) => {
     setSelectedProduct(newValue);
+    if (newValue) {
+      setCustomItemRate(newValue.price);
+    }
   };
 
   const handleQuantityChange = (value) => {
@@ -130,8 +158,17 @@ const CustomOrder = () => {
     setSelectedQuantity(value);
   };
 
+  const handleCustomRateChange = (e) => {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value) && value >= 0) {
+      setCustomItemRate(value);
+    }
+  };
+
   const handleAddProductToOrder = () => {
     if (!selectedProduct) return;
+
+    const price = useCustomItemRate ? customItemRate : selectedProduct.price;
 
     // Check if product already exists in order
     const existingItemIndex = orderItems.findIndex(
@@ -151,7 +188,8 @@ const CustomOrder = () => {
           product_id: selectedProduct.id,
           product: selectedProduct,
           quantity: selectedQuantity,
-          price: selectedProduct.price
+          price: price,
+          custom_price: useCustomItemRate
         }
       ]);
     }
@@ -176,6 +214,21 @@ const CustomOrder = () => {
     const updatedItems = [...orderItems];
     updatedItems.splice(index, 1);
     setOrderItems(updatedItems);
+  };
+
+  const handleDiscountTypeChange = (e) => {
+    setDiscountType(e.target.value);
+  };
+
+  const handleOrderDiscountChange = (e) => {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value) && value >= 0) {
+      setOrderDiscount(value);
+    }
+  };
+  
+  const handleOrderDiscountTypeChange = (e) => {
+    setOrderDiscountType(e.target.value);
   };
 
   const validateOrder = () => {
@@ -211,8 +264,18 @@ const CustomOrder = () => {
       setSuccess('');
 
       const token = localStorage.getItem('token');
+      
+      // Prepare discount information
+      const discountInfo = 
+        discountType === 'order' 
+          ? {
+              discount_type: orderDiscountType,
+              discount_value: orderDiscount
+            }
+          : {};
+      
       await api.post(
-        '/admin/orders',
+        '/admin/custom-orders',
         {
           user_id: selectedUser.id,
           delivery_address: orderDetails.delivery_address,
@@ -223,7 +286,9 @@ const CustomOrder = () => {
             product_id: item.product_id,
             quantity: item.quantity,
             price_at_purchase: item.price
-          }))
+          })),
+          ...discountInfo,
+          total_amount: totalAmount
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -404,11 +469,20 @@ const CustomOrder = () => {
                                 <Typography variant="caption" color="textSecondary">
                                   Stock: {item.product.stock_quantity}
                                 </Typography>
+                                {item.custom_price && (
+                                  <Typography variant="caption" color="primary" sx={{ display: 'block' }}>
+                                    Custom Price
+                                  </Typography>
+                                )}
                               </Box>
                             </Box>
                           </TableCell>
                           <TableCell align="right">
-                            ₹{item.price.toFixed(2)}
+                            {item.custom_price ? (
+                              <Typography color="primary">₹{item.price.toFixed(2)}</Typography>
+                            ) : (
+                              <Typography>₹{item.price.toFixed(2)}</Typography>
+                            )}
                           </TableCell>
                           <TableCell align="center">
                             <Box className="flex items-center justify-center">
@@ -461,6 +535,71 @@ const CustomOrder = () => {
                   </Typography>
                 </Box>
               </>
+            )}
+          </Paper>
+
+          <Paper className="p-4 mb-4">
+            <Typography variant="h6" gutterBottom>
+              Discount Options
+            </Typography>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Discount Type</InputLabel>
+              <Select
+                value={discountType}
+                onChange={handleDiscountTypeChange}
+                label="Discount Type"
+              >
+                <MenuItem value="none">No Discount</MenuItem>
+                <MenuItem value="order">Order-level Discount</MenuItem>
+                <MenuItem value="item">Item-level Custom Prices</MenuItem>
+              </Select>
+            </FormControl>
+            
+            {discountType === 'order' && (
+              <Box className="mt-3">
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Discount Value"
+                      type="number"
+                      value={orderDiscount}
+                      onChange={handleOrderDiscountChange}
+                      fullWidth
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            {orderDiscountType === 'percentage' ? '%' : '₹'}
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Discount Method</InputLabel>
+                      <Select
+                        value={orderDiscountType}
+                        onChange={handleOrderDiscountTypeChange}
+                        label="Discount Method"
+                      >
+                        <MenuItem value="percentage">Percentage</MenuItem>
+                        <MenuItem value="fixed">Fixed Amount</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+                {orderDiscountType === 'percentage' && orderDiscount > 0 && (
+                  <Typography variant="body2" color="textSecondary" className="mt-2">
+                    Discount Amount: ₹{((orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * orderDiscount) / 100).toFixed(2)}
+                  </Typography>
+                )}
+              </Box>
+            )}
+            
+            {discountType === 'item' && (
+              <Typography variant="body2" color="textSecondary" className="mt-2">
+                Use custom prices when adding individual products to the order.
+              </Typography>
             )}
           </Paper>
 
@@ -614,51 +753,93 @@ const CustomOrder = () => {
           />
 
           {selectedProduct && (
-            <Box className="mt-4">
-              <Typography variant="subtitle2" gutterBottom>
-                Quantity: (Available: {selectedProduct.stock_quantity})
-              </Typography>
-              <Box className="flex items-center">
-                <IconButton 
-                  size="small"
-                  onClick={() => handleQuantityChange(selectedQuantity - 1)}
-                >
-                  <RemoveIcon />
-                </IconButton>
-                <TextField
-                  value={selectedQuantity}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    if (!isNaN(value) && value > 0 && value <= selectedProduct.stock_quantity) {
-                      handleQuantityChange(value);
-                    }
-                  }}
-                  size="small"
-                  type="number"
-                  InputProps={{ 
-                    inputProps: { 
-                      min: 1, 
-                      max: selectedProduct.stock_quantity 
-                    } 
-                  }}
-                  sx={{ width: 60, mx: 1 }}
-                />
-                <IconButton 
-                  size="small"
-                  onClick={() => handleQuantityChange(Math.min(selectedQuantity + 1, selectedProduct.stock_quantity))}
-                >
-                  <AddIcon />
-                </IconButton>
+            <>
+              <Box className="mt-4">
+                <Typography variant="subtitle2" gutterBottom>
+                  Quantity: (Available: {selectedProduct.stock_quantity})
+                </Typography>
+                <Box className="flex items-center">
+                  <IconButton 
+                    size="small"
+                    onClick={() => handleQuantityChange(selectedQuantity - 1)}
+                  >
+                    <RemoveIcon />
+                  </IconButton>
+                  <TextField
+                    value={selectedQuantity}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      if (!isNaN(value) && value > 0 && value <= selectedProduct.stock_quantity) {
+                        handleQuantityChange(value);
+                      }
+                    }}
+                    size="small"
+                    type="number"
+                    InputProps={{ 
+                      inputProps: { 
+                        min: 1, 
+                        max: selectedProduct.stock_quantity 
+                      } 
+                    }}
+                    sx={{ width: 60, mx: 1 }}
+                  />
+                  <IconButton 
+                    size="small"
+                    onClick={() => handleQuantityChange(Math.min(selectedQuantity + 1, selectedProduct.stock_quantity))}
+                  >
+                    <AddIcon />
+                  </IconButton>
+                </Box>
               </Box>
+              
+              <Box className="mt-4">
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={useCustomItemRate}
+                      onChange={(e) => setUseCustomItemRate(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Use Custom Price"
+                />
+                
+                {useCustomItemRate && (
+                  <TextField
+                    label="Custom Price (₹)"
+                    type="number"
+                    value={customItemRate}
+                    onChange={handleCustomRateChange}
+                    fullWidth
+                    margin="normal"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">₹</InputAdornment>
+                      ),
+                    }}
+                  />
+                )}
+              </Box>
+              
               <Box className="mt-4 flex justify-between">
                 <Typography>
-                  Price: ₹{selectedProduct.price.toFixed(2)}
+                  Price: ₹{useCustomItemRate ? customItemRate.toFixed(2) : selectedProduct.price.toFixed(2)}
                 </Typography>
                 <Typography>
-                  Subtotal: ₹{(selectedProduct.price * selectedQuantity).toFixed(2)}
+                  Subtotal: ₹{(useCustomItemRate ? customItemRate : selectedProduct.price * selectedQuantity).toFixed(2)}
                 </Typography>
               </Box>
-            </Box>
+              
+              {useCustomItemRate && selectedProduct && customItemRate !== selectedProduct.price && (
+                <Box className="mt-2 p-2 bg-orange-50 rounded">
+                  <Typography variant="body2" color="warning.main">
+                    {customItemRate > selectedProduct.price ? 'Price increased by ' : 'Price decreased by '}
+                    {Math.abs(customItemRate - selectedProduct.price).toFixed(2)} (
+                    {Math.round(Math.abs((customItemRate / selectedProduct.price - 1) * 100))}%)
+                  </Typography>
+                </Box>
+              )}
+            </>
           )}
         </DialogContent>
         <DialogActions>

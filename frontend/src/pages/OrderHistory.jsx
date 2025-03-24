@@ -313,10 +313,11 @@ const OrderHistory = () => {
 // Order Card Component
 const OrderCard = ({ order, getStatusColor, getPaymentStatusColor, formatDate, showRepeatButton, onRepeatOrder }) => {
   const [expanded, setExpanded] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <Paper className="mb-4 overflow-hidden">
-      <Box className="p-4 flex justify-between items-center">
+      <Box className="p-4 flex flex-wrap justify-between items-center">
         <Box>
           <Typography variant="subtitle1" className="font-semibold">
             Order #{order.id.substring(0, 8)}
@@ -325,17 +326,23 @@ const OrderCard = ({ order, getStatusColor, getPaymentStatusColor, formatDate, s
             {formatDate(order.order_date)}
           </Typography>
         </Box>
-        <Box className="flex items-center gap-2">
-          <Chip 
-            label={order.payment_status.toUpperCase()} 
-            color={getPaymentStatusColor(order.payment_status)}
-            size="small"
-          />
-          <Chip 
-            label={order.order_status.toUpperCase()} 
-            color={getStatusColor(order.order_status)}
-            size="small"
-          />
+        <Box className="flex items-center gap-2 mt-2 sm:mt-0">
+          <Box>
+            <Typography variant="body2" color="textSecondary">Payment Status:</Typography>
+            <Chip 
+              label={order.payment_status.toUpperCase()} 
+              color={getPaymentStatusColor(order.payment_status)}
+              size="small"
+            />
+          </Box>
+          <Box className="ml-3">
+            <Typography variant="body2" color="textSecondary">Delivery Status:</Typography>
+            <Chip 
+              label={order.order_status.toUpperCase()} 
+              color={getStatusColor(order.order_status)}
+              size="small"
+            />
+          </Box>
           <Typography variant="subtitle1" className="ml-4">
             ₹{order.total_amount.toFixed(2)}
           </Typography>
@@ -349,19 +356,34 @@ const OrderCard = ({ order, getStatusColor, getPaymentStatusColor, formatDate, s
         <Typography variant="body2" color="textSecondary">
           {expanded ? "Hide Details" : "Show Details"}
         </Typography>
-        {showRepeatButton && order.order_status === 'delivered' && (
-          <Button 
+        <Box>
+          <Button
             variant="outlined"
-            startIcon={<RepeatIcon />}
+            color="primary"
             onClick={(e) => {
               e.stopPropagation();
-              onRepeatOrder();
+              navigate(`/orders/${order.id}`);
             }}
             size="small"
+            sx={{ mr: 1 }}
           >
-            Repeat Order
+            View Details
           </Button>
-        )}
+          {showRepeatButton && order.order_status === 'delivered' && (
+            <Button 
+              variant="contained"
+              color="primary"
+              startIcon={<RepeatIcon />}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRepeatOrder();
+              }}
+              size="small "
+            >
+              Repeat Order
+            </Button>
+          )}
+        </Box>
       </Box>
 
       {expanded && (
@@ -414,16 +436,3 @@ const OrderCard = ({ order, getStatusColor, getPaymentStatusColor, formatDate, s
 };
 
 export default OrderHistory;
-
-{/* {order.order_status !== 'cancelled' && 
- order.order_status !== 'delivered' && (
-  <Button
-    variant="text"
-    color="error"
-    size="small"
-    className="ml-2"
-    onClick={() => handleCancelRequest(order.id)}
-  >
-    Cancel
-  </Button>
-)} */}

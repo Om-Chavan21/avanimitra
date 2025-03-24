@@ -14,6 +14,7 @@ users_collection = database.users
 products_collection = database.products
 carts_collection = database.carts
 orders_collection = database.orders
+payment_settings_collection = database.payment_settings
 
 
 # Helper functions to convert between MongoDB ObjectId and string
@@ -88,3 +89,30 @@ async def update_cart_item(user_id, product_id, quantity):
 
 async def clear_cart(user_id):
     await carts_collection.update_one({"user_id": user_id}, {"$set": {"items": []}})
+
+
+# Payment settings operations
+async def get_payment_settings():
+    settings = await payment_settings_collection.find_one({})
+    if not settings:
+        # Create default settings if not exist
+        default_settings = {
+            "bank_name": "State Bank of India",
+            "account_holder": "Avani Mitra Organics",
+            "account_number": "1234567890",
+            "ifsc_code": "SBIN0001234",
+            "upi_id": "avanimitra@upi",
+            "gpay_number": "9876543210"
+        }
+        await payment_settings_collection.insert_one(default_settings)
+        return default_settings
+    return serialize_doc_id(settings)
+
+
+async def update_payment_settings(settings_data):
+    settings = await payment_settings_collection.find_one({})
+    if settings:
+        await payment_settings_collection.update_one({}, {"$set": settings_data})
+    else:
+        await payment_settings_collection.insert_one(settings_data)
+    return await get_payment_settings()

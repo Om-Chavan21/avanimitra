@@ -43,7 +43,7 @@ const Cart = () => {
     }));
   };
 
-  const handleSubmitOrder = async () => {
+  const handleProceedToPayment = () => {
     if (!cart.items.length) {
       setError('Your cart is empty');
       return;
@@ -54,36 +54,14 @@ const Cart = () => {
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      setError('');
-      
-      const token = localStorage.getItem('token');
-      await api.post(
-        '/orders',
-        {
-          ...orderData,
-          items: cart.items.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity
-          }))
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-      
-      setSuccess('Order placed successfully!');
-      setTimeout(() => {
-        navigate('/orders');
-      }, 1500);
-    } catch (error) {
-      setError(error.response?.data?.detail || 'Failed to place order');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Navigate to payment options page with order details
+    navigate('/payment-options', {
+      state: {
+        orderDetails: orderData,
+        cartItems: cart.items,
+        totalAmount: cart.total_price
+      }
+    });
   };
 
   if (isLoading) {
@@ -103,13 +81,13 @@ const Cart = () => {
       </Typography>
 
       {error && (
-        <Alert severity="error" className="mb-4">
+        <Alert severity="error" className="mb-4" onClose={() => setError('')}>
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert severity="success" className="mb-4">
+        <Alert severity="success" className="mb-4" onClose={() => setSuccess('')}>
           {success}
         </Alert>
       )}
@@ -249,13 +227,13 @@ const Cart = () => {
                   fullWidth
                   size="large"
                   className="mt-4"
-                  onClick={handleSubmitOrder}
+                  onClick={handleProceedToPayment}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? <CircularProgress size={24} /> : 'Proceed to Payment'}
                 </Button>
               </Box>
-              </Paper>
+            </Paper>
           </Grid>
         </Grid>
       )}
