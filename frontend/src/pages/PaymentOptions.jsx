@@ -1,14 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+// frontend/src/pages/PaymentOptions.jsx
+
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container, Typography, Box, Paper, Grid, Button, TextField, 
   Radio, RadioGroup, FormControlLabel, FormControl, FormLabel,
-  Divider, CircularProgress, Alert, Tabs, Tab, Card, IconButton,
-  Tooltip, Snackbar
+  Divider, CircularProgress, Alert, Snackbar, IconButton
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import api from '../utils/api';
 
 const PaymentOptions = () => {
@@ -33,10 +32,6 @@ const PaymentOptions = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedText, setCopiedText] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
-  
-  // For screenshot upload
-  const [selectedFile, setSelectedFile] = useState(null);
-  const fileInputRef = useRef(null);
   
   useEffect(() => {
     // Verify if order details exist, if not redirect back to cart
@@ -76,14 +71,6 @@ const PaymentOptions = () => {
     setOpenSnackbar(false);
   };
   
-  const handleFileChange = (event) => {
-    setSelectedFile(event.target.files[0]);
-  };
-  
-  const triggerFileInput = () => {
-    fileInputRef.current.click();
-  };
-  
   const handleSubmitOrder = async () => {
     try {
       setIsSubmitting(true);
@@ -95,44 +82,18 @@ const PaymentOptions = () => {
       const orderData = {
         delivery_address: orderDetails.delivery_address,
         receiver_phone: orderDetails.receiver_phone,
+        payment_method: paymentMethod,
         items: cartItems.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity
         }))
       };
       
-      let response;
-      
-      // If there's a file, use FormData
-      if (selectedFile) {
-        const formData = new FormData();
-        
-        // Add the file
-        formData.append('payment_screenshot', selectedFile);
-        
-        // Add payment method
-        formData.append('payment_method', paymentMethod);
-        
-        // Add order data as a JSON string in a single field
-        formData.append('order_data', JSON.stringify(orderData));
-        
-        response = await api.post('/orders', formData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-      } else {
-        // Without file, use regular JSON
-        response = await api.post('/orders', {
-          ...orderData,
-          payment_method: paymentMethod
-        }, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-      }
+      const response = await api.post('/orders', orderData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       
       setSuccess('Order placed successfully!');
       setTimeout(() => {
@@ -290,35 +251,6 @@ const PaymentOptions = () => {
                     />
                   </Grid>
                 </Grid>
-                
-                <Box className="mt-4">
-                  <Typography variant="subtitle1" gutterBottom>
-                    Upload Payment Screenshot (Optional)
-                  </Typography>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                  />
-                  
-                  <Box className="flex items-center gap-2">
-                    <Button
-                      variant="outlined"
-                      startIcon={<UploadFileIcon />}
-                      onClick={triggerFileInput}
-                    >
-                      Select File
-                    </Button>
-                    {selectedFile && (
-                      <Box className="flex items-center gap-1">
-                        <CheckCircleOutlineIcon color="success" />
-                        <Typography variant="body2">{selectedFile.name}</Typography>
-                      </Box>
-                    )}
-                  </Box>
-                </Box>
               </Box>
             )}
             
@@ -370,42 +302,13 @@ const PaymentOptions = () => {
                     />
                   </Grid>
                 </Grid>
-                
-                <Box className="mt-4">
-                  <Typography variant="subtitle1" gutterBottom>
-                    Upload Payment Screenshot (Optional)
-                  </Typography>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                  />
-                  
-                  <Box className="flex items-center gap-2">
-                    <Button
-                      variant="outlined"
-                      startIcon={<UploadFileIcon />}
-                      onClick={triggerFileInput}
-                    >
-                      Select File
-                    </Button>
-                    {selectedFile && (
-                      <Box className="flex items-center gap-1">
-                        <CheckCircleOutlineIcon color="success" />
-                        <Typography variant="body2">{selectedFile.name}</Typography>
-                      </Box>
-                    )}
-                  </Box>
-                </Box>
               </Box>
             )}
             
             <Divider className="my-6" />
             
             <Typography variant="body1" className="mb-4">
-              Please make the payment and click "Confirm Payment" to complete your order. We'll process your order once we've confirmed your payment.
+              Please make the payment using the details above, then click "Confirm Order" to complete your purchase. We'll process your order once it's received.
             </Typography>
             
             <Box className="flex justify-between">
@@ -422,7 +325,7 @@ const PaymentOptions = () => {
                 onClick={handleSubmitOrder}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? <CircularProgress size={24} /> : 'Confirm Payment'}
+                {isSubmitting ? <CircularProgress size={24} /> : 'Confirm Order'}
               </Button>
             </Box>
           </Paper>

@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from os import environ, path
+import os
 import tempfile
 
 from models import (
@@ -42,8 +43,6 @@ router = APIRouter()
 @router.post("/orders", response_model=OrderResponse)
 async def create_order(
     order_data: OrderCreate,
-    payment_method: Optional[str] = Form(None),
-    payment_screenshot: Optional[UploadFile] = None,
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Create new order
@@ -56,34 +55,8 @@ async def create_order(
         "total_amount": 0,
         "order_status": OrderStatus.PENDING,
         "payment_status": PaymentStatus.PENDING,
-        "payment_method": payment_method or "bank",
+        "payment_method": order_data.payment_method or "bank",
     }
-
-    # Handle payment screenshot if provided
-    if payment_screenshot:
-        # Save screenshot to a temporary file
-        temp_file_path = None
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-                content = await payment_screenshot.read()
-                tmp.write(content)
-                temp_file_path = tmp.name
-            
-            # Store payment details
-            order["payment_details"] = {
-                "screenshot_path": temp_file_path,
-                "original_filename": payment_screenshot.filename,
-            }
-        except Exception as e:
-            if temp_file_path and path.exists(temp_file_path):
-                try:
-                    os.unlink(temp_file_path)
-                except:
-                    pass
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error processing payment screenshot: {str(e)}"
-            )
 
     # Process order items
     items = []
@@ -142,7 +115,6 @@ async def create_order(
     # Format response
     order_response = await get_order_with_products(order["id"])
     return order_response
-
 
 @router.get("/orders", response_model=List[OrderResponse])
 async def get_user_orders(current_user: UserInDB = Depends(get_current_user)):

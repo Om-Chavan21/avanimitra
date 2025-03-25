@@ -125,7 +125,7 @@ class OrderCreate(BaseModel):
     delivery_address: str
     receiver_phone: str
     items: List[CartItem]
-    payment_method: Optional[str] = None
+    payment_method: Optional[str] = "bank"
 
 
 class OrderItemResponse(OrderItemBase):
