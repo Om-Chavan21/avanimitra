@@ -145,9 +145,9 @@ const ProductCard = ({ product }) => {
               </Typography>
               {product.stock_quantity > 0 ? (
                 <>
-                  <Typography variant="body2" color={product.stock_quantity <= 10 ? "error" : "textSecondary"}>
+                  {/* <Typography variant="body2" color={product.stock_quantity <= 10 ? "error" : "textSecondary"}>
                     In stock: {product.stock_quantity} units
-                  </Typography>
+                  </Typography> */}
                   <Box className="flex items-center mt-4">
                     <IconButton 
                       color="primary"
