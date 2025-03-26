@@ -97,12 +97,12 @@ async def get_payment_settings():
     if not settings:
         # Create default settings if not exist
         default_settings = {
-            "bank_name": "State Bank of India",
-            "account_holder": "Avani Mitra Organics",
-            "account_number": "1234567890",
-            "ifsc_code": "SBIN0001234",
-            "upi_id": "avanimitra@upi",
-            "gpay_number": "9876543210"
+            "bank_name": "IDBI Bank Limited",
+            "account_holder": "Atharva Datar",
+            "account_number": "0490104000173407",
+            "ifsc_code": "IBKL0000490",
+            "upi_id": "acdatar-3@okhdfcbank",
+            "gpay_number": "9764814452"
         }
         await payment_settings_collection.insert_one(default_settings)
         return default_settings

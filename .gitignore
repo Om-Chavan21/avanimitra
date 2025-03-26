@@ -2,6 +2,7 @@ farm-stack-course/venv
 .env
 
 node_modules/
+public-archive/
 __pycache__/
 **/__pycache__/
 .DS_Store/

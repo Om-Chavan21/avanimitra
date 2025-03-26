@@ -20,23 +20,23 @@ const AboutUs = () => {
     {
       name: 'Atharva Datar',
       role: 'Co-founder',
-      bio: 'Passionate about sustainable farming and bringing organic produce to more households.',
-      phone: '+91 9876543210',
-      image: 'https://source.unsplash.com/random/300x300/?portrait&man=1'
+      bio: "Volunteer at Jnana Prabodhini's Youth Wing. Member of Jnana Prabodhini's Atal Community Innovation Center, Nigdi",
+      phone: '+91 9764814452',
+      image: '/profile_icon.png'
     },
     {
       name: 'Om Chavan',
       role: 'Co-founder',
-      bio: 'Expert in agricultural practices with a vision to connect farmers directly with consumers.',
+      bio: "Volunteer at Jnana Prabodhini's Youth Wing. Intern at KPIT Technologies",
       phone: '+91 9876543211',
-      image: 'https://source.unsplash.com/random/300x300/?portrait&man=2'
+      image: '/om_chavan.jpeg'
     },
     {
       name: 'Suresh Margale',
       role: 'Co-founder',
-      bio: 'Brings years of experience in supply chain management and distribution networks.',
+      bio: "Volunteer at Jnana Prabodhini's Youth Wing. Full time member of Jnana Prabodhini Harali.",
       phone: '+91 9876543212',
-      image: 'https://source.unsplash.com/random/300x300/?portrait&man=3'
+      image: '/profile_icon_2.png'
     }
   ];
 
@@ -61,13 +61,13 @@ const AboutUs = () => {
       </Box>
 
       {/* Our Story */}
-      <StyledSection>
+      {/* <StyledSection>
         <Container>
           <Grid container spacing={6} alignItems="center">
             <Grid item xs={12} md={6}>
               <Box 
                 component="img"
-                src="https://source.unsplash.com/random/600x400/?organic,farm"
+                src="/organic_farm.jpeg"
                 alt="Organic Farm"
                 sx={{ 
                   width: '100%', 
@@ -89,10 +89,10 @@ const AboutUs = () => {
             </Grid>
           </Grid>
         </Container>
-      </StyledSection>
+      </StyledSection> */}
 
       {/* Our Mission */}
-      <StyledSection sx={{ bgcolor: 'background.paper' }}>
+      {/* <StyledSection sx={{ bgcolor: 'background.paper' }}>
         <Container>
           <Typography variant="h3" align="center" gutterBottom>
             Our Mission
@@ -167,7 +167,7 @@ const AboutUs = () => {
             </Grid>
           </Grid>
         </Container>
-      </StyledSection>
+      </StyledSection> */}
 
       {/* Meet The Team */}
       <StyledSection>
@@ -176,7 +176,7 @@ const AboutUs = () => {
             Meet Our Team
           </Typography>
           <Typography variant="body1" align="center" paragraph sx={{ maxWidth: 800, mx: 'auto', mb: 6 }}>
-            The passionate individuals behind Avani Mitra who work tirelessly to bring you the best organic produce.
+            The passionate individuals behind Avani Mitra who work to bring you the best organic produce.
           </Typography>
           
           <Grid container spacing={4}>
@@ -188,6 +188,10 @@ const AboutUs = () => {
                     height="260"
                     image={member.image}
                     alt={member.name}
+                    sx={{
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                    }}
                   />
                   <CardContent>
                     <Typography variant="h5" gutterBottom>
@@ -211,7 +215,7 @@ const AboutUs = () => {
       </StyledSection>
 
       {/* Values */}
-      <StyledSection sx={{ bgcolor: 'background.paper' }}>
+      {/* <StyledSection sx={{ bgcolor: 'background.paper' }}>
         <Container>
           <Typography variant="h3" align="center" gutterBottom>
             Our Values
@@ -251,7 +255,7 @@ const AboutUs = () => {
             </Grid>
           </Grid>
         </Container>
-      </StyledSection>
+      </StyledSection> */}
     </Box>
   );
 };

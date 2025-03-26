@@ -31,6 +31,10 @@ const Home = () => {
   const theme = useTheme();
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await api.get('/products');
@@ -205,7 +209,7 @@ const Home = () => {
           <Typography variant="h3" component="h2" align="center" gutterBottom>
             About Avani Mitra
           </Typography>
-          <Typography variant="body1" paragraph className="text-center mb-8">
+          {/* <Typography variant="body1" paragraph className="text-center mb-8">
             Avani Mitra is dedicated to cultivating the finest organic fruits using sustainable 
             farming practices that respect our environment and promote biodiversity.
           </Typography>
@@ -234,7 +238,7 @@ const Home = () => {
                 </Typography>
               </Box>
             </Grid>
-          </Grid>
+          </Grid> */}
           
           <Box className="mt-8 text-center">
             <Button 

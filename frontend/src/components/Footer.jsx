@@ -4,6 +4,7 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -114,7 +115,8 @@ const Footer = () => {
                   +91 8390770254
                 </Typography>
               </Box>
-              <Box component="li" sx={{ mb: 1 }}>
+              <Box component="li" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                <LocationOnIcon fontSize="small" sx={{ mr: 1, color: 'primary.main' }} />
                 <Typography variant="body2">
                   Near MIT, Kothrud, Pune
                 </Typography>

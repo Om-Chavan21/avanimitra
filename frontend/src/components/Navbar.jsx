@@ -321,7 +321,7 @@ const Navbar = () => {
                           onClick={handleProfileMenuOpen}
                           sx={{ ml: 2 }}
                         >
-                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
                             <PersonIcon />
                           </Avatar>
                         </IconButton>

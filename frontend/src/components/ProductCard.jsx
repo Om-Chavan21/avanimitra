@@ -85,11 +85,28 @@ const ProductCard = ({ product }) => {
             <Typography variant="h6" color="primary">
               ₹{product.price.toFixed(2)}
             </Typography>
-            {product.stock_quantity <= 10 && product.stock_quantity > 0 && (
+            <Button 
+              color="inherit" 
+              onClick={handleOpen}
+              sx={{ 
+                borderColor: 'primary.main', 
+                color: 'primary.main', 
+                '&:hover': { 
+                  borderColor: 'primary.main', 
+                  backgroundColor: 'primary.main', 
+                  color: 'white' 
+                } 
+              }}
+            >
+              Add to Cart
+            </Button>
+          </Box>
+          <Box className="flex justify-end mt-2">
+          {/* {product.stock_quantity <= 10 && product.stock_quantity > 0 && (
               <Typography variant="caption" color="error">
                 Only {product.stock_quantity} left
               </Typography>
-            )}
+            )} */}
           </Box>
         </CardContent>
       </Card>
