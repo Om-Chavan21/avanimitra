@@ -49,6 +49,30 @@ const OrderManagement = () => {
   // Tab state
   const [tabValue, setTabValue] = useState(0);
   
+  const [users, setUsers] = useState({});
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await api.get('/admin/users', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+        const usersData = response.data;
+        const usersObj = {};
+        usersData.forEach((user) => {
+          usersObj[user.id] = user.name;
+        });
+        setUsers(usersObj);
+      } catch (err) {
+        console.error('Error fetching users:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
+
   useEffect(() => {
     // Check URL parameters for specific tab
     const statusParam = searchParams.get('status');
@@ -461,7 +485,7 @@ const OrderManagement = () => {
               <TableRow>
                 <TableCell>Order ID</TableCell>
                 <TableCell>Date</TableCell>
-                <TableCell>Customer ID</TableCell>
+                <TableCell>Customer Name</TableCell>
                 <TableCell>Items</TableCell>
                 <TableCell align="right">Amount (₹)</TableCell>
                 <TableCell>Status</TableCell>
@@ -474,7 +498,7 @@ const OrderManagement = () => {
                 <TableRow key={order.id}>
                   <TableCell>#{order.id.substring(0, 8)}</TableCell>
                   <TableCell>{formatDate(order.order_date)}</TableCell>
-                  <TableCell>{order.user_id.substring(0, 8)}</TableCell>
+                  <TableCell>{users[order.user_id]}</TableCell>
                   <TableCell>{order.items.length} items</TableCell>
                   <TableCell align="right">{order.total_amount.toFixed(2)}</TableCell>
                   <TableCell>
@@ -616,10 +640,10 @@ const OrderManagement = () => {
                     </Box>
                     <Box className="mb-2">
                       <Typography variant="body2" color="textSecondary">
-                        Customer ID:
+                        Customer Name:
                       </Typography>
                       <Typography variant="body1">
-                        {selectedOrder.user_id}
+                        {users[selectedOrder.user_id]}
                       </Typography>
                     </Box>
                     <Box className="mb-2">
