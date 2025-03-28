@@ -1,9 +1,10 @@
+// frontend/src/pages/Cart.jsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container, Typography, Box, Paper, Grid, Button, Divider,
   Card, CardContent, CardMedia, IconButton, TextField, CircularProgress,
-  Alert
+  Alert, Tooltip, Chip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -26,9 +27,9 @@ const Cart = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const handleQuantityChange = (productId, quantity) => {
+  const handleQuantityChange = (productId, quantity, customOptions) => {
     if (quantity < 1) return;
-    updateCartItem(productId, quantity);
+    updateCartItem(productId, quantity, customOptions);
   };
 
   const handleRemoveItem = (productId) => {
@@ -113,14 +114,29 @@ const Cart = () => {
                   <Box className="flex flex-col sm:flex-row">
                     <CardMedia
                       component="img"
-                      sx={{ width: { xs: '100%', sm: 140 } }}
+                      sx={{ width: { xs: '100%', sm: 140 }, height: { xs: 140, sm: 'auto' } }}
                       image={item.product.image_url}
                       alt={item.product.name}
                       className="object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "https://via.placeholder.com/140?text=Image+Not+Available";
+                      }}
                     />
                     <CardContent className="flex-grow">
                       <Box className="flex justify-between">
-                        <Typography variant="h6">{item.product.name}</Typography>
+                        <Typography variant="h6">
+                          {item.product.name}
+                          {item.selectedSize && (
+                            <Chip 
+                              size="small" 
+                              label={item.selectedSize} 
+                              color="primary" 
+                              variant="outlined" 
+                              sx={{ ml: 1 }}
+                            />
+                          )}
+                        </Typography>
                         <IconButton 
                           color="error"
                           onClick={() => handleRemoveItem(item.product_id)}
@@ -128,35 +144,69 @@ const Cart = () => {
                           <DeleteIcon />
                         </IconButton>
                       </Box>
+                      
                       <Typography variant="body2" color="text.secondary" paragraph className="line-clamp-2">
                         {item.product.description}
                       </Typography>
-                      <Typography variant="body1" color="primary">
-                        ₹{item.product.price.toFixed(2)}
-                      </Typography>
-                      <Box className="flex items-center mt-2">
-                        <IconButton 
-                          color="primary" 
-                          onClick={() => handleQuantityChange(item.product_id, item.quantity - 1)}
-                          disabled={item.quantity <= 1}
-                        >
-                          <RemoveIcon />
-                        </IconButton>
-                        <TextField
-                          variant="outlined"
-                          size="small"
-                          value={item.quantity}
-                          InputProps={{
-                            readOnly: true,
-                          }}
-                          sx={{ width: '60px', mx: 1 }}
-                        />
-                        <IconButton 
-                          color="primary"
-                          onClick={() => handleQuantityChange(item.product_id, item.quantity + 1)}
-                        >
-                          <AddIcon />
-                        </IconButton>
+                      
+                      <Box className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                        <Typography variant="body1" color="primary" className="mb-2 sm:mb-0">
+                          ₹{(item.pricePerUnit || item.product.price).toFixed(2)}
+                          {item.unit && item.unit !== 'box' && (
+                            <Typography component="span" variant="body2" color="text.secondary">
+                              {` per ${item.unit}`}
+                            </Typography>
+                          )}
+                        </Typography>
+                        
+                        <Box className="flex items-center">
+                          <IconButton 
+                            color="primary" 
+                            onClick={() => handleQuantityChange(
+                              item.product_id, 
+                              item.quantity - 1, 
+                              {
+                                selectedSize: item.selectedSize,
+                                pricePerUnit: item.pricePerUnit,
+                                unit: item.unit
+                              }
+                            )}
+                            disabled={item.quantity <= 1}
+                            size="small"
+                          >
+                            <RemoveIcon />
+                          </IconButton>
+                          <TextField
+                            variant="outlined"
+                            size="small"
+                            value={item.quantity}
+                            InputProps={{
+                              readOnly: true,
+                            }}
+                            sx={{ width: '55px', mx: 1 }}
+                          />
+                          <IconButton 
+                            color="primary"
+                            onClick={() => handleQuantityChange(
+                              item.product_id, 
+                              item.quantity + 1,
+                              {
+                                selectedSize: item.selectedSize,
+                                pricePerUnit: item.pricePerUnit,
+                                unit: item.unit
+                              }
+                            )}
+                            size="small"
+                          >
+                            <AddIcon />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                      
+                      <Box className="mt-2 flex justify-end">
+                        <Typography variant="body1" fontWeight="bold">
+                          ₹{((item.pricePerUnit || item.product.price) * item.quantity).toFixed(2)}
+                        </Typography>
                       </Box>
                     </CardContent>
                   </Box>
@@ -234,6 +284,15 @@ const Cart = () => {
                 </Button>
               </Box>
             </Paper>
+            
+            <Box className="mt-4 text-center">
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/')}
+              >
+                Continue Shopping
+              </Button>
+            </Box>
           </Grid>
         </Grid>
       )}

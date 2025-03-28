@@ -1,8 +1,10 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+// frontend/src/App.jsx
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { theme } from './theme';
+import { useEffect } from 'react';
 
 // Components
 import Navbar from './components/Navbar';
@@ -48,10 +50,22 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   return children;
 };
 
+// Scroll to top component for route changes
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <ScrollToTop />
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className="flex-grow">

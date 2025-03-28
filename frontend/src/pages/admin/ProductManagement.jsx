@@ -1,14 +1,16 @@
+// frontend/src/pages/admin/ProductManagement.jsx
 import { useState, useEffect } from 'react';
 import {
   Container, Typography, Box, Paper, Button, TextField, Grid,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
   CircularProgress, FormControl, InputLabel, Select, MenuItem, Alert,
-  Card, CardMedia
+  Card, CardMedia, Tabs, Tab, FormControlLabel, Switch, Tooltip
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import api from '../../utils/api';
 
 const ProductManagement = () => {
@@ -16,10 +18,12 @@ const ProductManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   
   // Dialog states
   const [openDialog, setOpenDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState('add'); // 'add' or 'edit'
+  const [dialogMode, setDialogMode] = useState('add'); // 'add', 'edit', or 'duplicate'
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -27,7 +31,9 @@ const ProductManagement = () => {
     stock_quantity: '',
     category: '',
     image_url: '',
-    status: ''
+    status: '',
+    has_custom_options: false,
+    custom_options: []
   });
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,12 +44,15 @@ const ProductManagement = () => {
   
   // Product categories
   const categories = [
-    'apples', 'bananas', 'berries', 'citrus', 'grapes', 
-    'mangoes', 'melons', 'stone_fruits', 'tropical', 'other'
+    'mangoes', 'apples', 'bananas', 'berries', 'citrus', 'grapes', 
+    'melons', 'stone_fruits', 'tropical', 'other'
   ];
   
   // Product statuses
-  const statuses = ['active', 'inactive', 'out_of_stock'];
+  const statuses = ['active', 'inactive', 'out_of_stock', 'seasonal'];
+  
+  // Tab for managoes vs other products
+  const [tabValue, setTabValue] = useState(0);
   
   useEffect(() => {
     fetchProducts();
@@ -68,28 +77,44 @@ const ProductManagement = () => {
     }
   };
   
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
   const handleOpenDialog = (mode, product = null) => {
     setDialogMode(mode);
-    if (mode === 'edit' && product) {
-      setFormData({
-        id: product.id,
+    if (mode === 'edit' || mode === 'duplicate') {
+      const productCopy = {
+        id: mode === 'edit' ? product.id : undefined,
         name: product.name,
         description: product.description,
         price: product.price.toString(),
         stock_quantity: product.stock_quantity.toString(),
         category: product.category,
         image_url: product.image_url,
-        status: product.status
-      });
+        status: product.status,
+        has_custom_options: product.has_custom_options || false,
+        custom_options: product.custom_options || []
+      };
+      
+      // If it's a duplicate, modify the name slightly
+      if (mode === 'duplicate') {
+        productCopy.name = `${productCopy.name} (Copy)`;
+      }
+      
+      setFormData(productCopy);
     } else {
+      // Default values for new product
       setFormData({
         name: '',
         description: '',
         price: '',
         stock_quantity: '',
-        category: '',
+        category: 'other', // Default category
         image_url: '',
-        status: 'active'
+        status: 'active', // Default status
+        has_custom_options: false,
+        custom_options: []
       });
     }
     setFormErrors({});
@@ -101,10 +126,12 @@ const ProductManagement = () => {
   };
   
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    const newValue = type === 'checkbox' ? checked : value;
+    
     setFormData({
       ...formData,
-      [name]: value
+      [name]: newValue
     });
     
     // Clear the error for this field
@@ -151,7 +178,7 @@ const ProductManagement = () => {
         stock_quantity: parseInt(formData.stock_quantity)
       };
       
-      if (dialogMode === 'add') {
+      if (dialogMode === 'add' || dialogMode === 'duplicate') {
         await api.post('/admin/products', payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -206,6 +233,26 @@ const ProductManagement = () => {
       handleCloseDeleteDialog();
     }
   };
+
+  // Filter products based on category and status
+  const filterProducts = (products) => {
+    return products.filter(product => {
+      const categoryMatch = categoryFilter === 'all' || product.category === categoryFilter;
+      const statusMatch = statusFilter === 'all' || product.status === statusFilter;
+      return categoryMatch && statusMatch;
+    });
+  };
+  
+  // Separate products by category for tabs
+  const mangoes = products.filter(product => product.category === 'mangoes');
+  const otherProducts = products.filter(product => product.category !== 'mangoes');
+  
+  // Get the correct list based on current tab and filters
+  const displayProducts = tabValue === 0 ? 
+    filterProducts(products) : 
+    tabValue === 1 ? 
+    filterProducts(mangoes) : 
+    filterProducts(otherProducts);
   
   return (
     <Container maxWidth="lg" className="py-8">
@@ -235,10 +282,56 @@ const ProductManagement = () => {
         </Alert>
       )}
       
+      <Box className="mb-4">
+        <Tabs value={tabValue} onChange={handleTabChange}>
+          <Tab label="All Products" />
+          <Tab label="Mangoes" />
+          <Tab label="Other Products" />
+        </Tabs>
+      </Box>
+      
+      <Box className="flex flex-wrap gap-4 mb-4">
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Category</InputLabel>
+          <Select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            label="Category"
+          >
+            <MenuItem value="all">All Categories</MenuItem>
+            {categories.map(category => (
+              <MenuItem key={category} value={category}>
+                {category.replace('_', ' ')}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            label="Status"
+          >
+            <MenuItem value="all">All Statuses</MenuItem>
+            {statuses.map(status => (
+              <MenuItem key={status} value={status}>
+                {status}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+      
       {loading ? (
         <Box display="flex" justifyContent="center" p={4}>
           <CircularProgress />
         </Box>
+      ) : displayProducts.length === 0 ? (
+        <Paper className="p-4 text-center">
+          <Typography color="textSecondary">No products found</Typography>
+        </Paper>
       ) : (
         <TableContainer component={Paper}>
           <Table>
@@ -254,7 +347,7 @@ const ProductManagement = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {products.map((product) => (
+              {displayProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
                     <img 
@@ -277,24 +370,41 @@ const ProductManagement = () => {
                         ? 'bg-green-100 text-green-800' 
                         : product.status === 'inactive'
                           ? 'bg-gray-100 text-gray-800'
+                          : product.status === 'seasonal'
+                          ? 'bg-blue-100 text-blue-800'
                           : 'bg-red-100 text-red-800'
                     }`}>
                       {product.status}
                     </span>
                   </TableCell>
                   <TableCell align="center">
-                    <IconButton 
-                      color="primary" 
-                      onClick={() => handleOpenDialog('edit', product)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton 
-                      color="error" 
-                      onClick={() => handleOpenDeleteDialog(product)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
+                    <Tooltip title="Edit">
+                      <IconButton 
+                        color="primary" 
+                        onClick={() => handleOpenDialog('edit', product)}
+                        size="small"
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Duplicate">
+                      <IconButton 
+                        color="info" 
+                        onClick={() => handleOpenDialog('duplicate', product)}
+                        size="small"
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton 
+                        color="error" 
+                        onClick={() => handleOpenDeleteDialog(product)}
+                        size="small"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}
@@ -306,7 +416,7 @@ const ProductManagement = () => {
       {/* Add/Edit Product Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
-          {dialogMode === 'add' ? 'Add New Product' : 'Edit Product'}
+          {dialogMode === 'add' ? 'Add New Product' : dialogMode === 'duplicate' ? 'Duplicate Product' : 'Edit Product'}
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} className="pt-2">
@@ -441,6 +551,24 @@ const ProductManagement = () => {
                     }}
                   />
                 </Card>
+              </Grid>
+            )}
+            
+            {formData.category === 'mangoes' && (
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.has_custom_options}
+                      onChange={handleInputChange}
+                      name="has_custom_options"
+                    />
+                  }
+                  label="This product has custom sizing options"
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Enable this for products with different sizes or packaging options
+                </Typography>
               </Grid>
             )}
           </Grid>

@@ -1,3 +1,4 @@
+// frontend/src/pages/admin/OrderManagement.jsx
 import { useState, useEffect } from 'react';
 import {
   Container, Typography, Box, Paper, Button, Grid,
@@ -45,6 +46,11 @@ const OrderManagement = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productQuantity, setProductQuantity] = useState(1);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [customItemRate, setCustomItemRate] = useState(0);
+  const [useCustomItemRate, setUseCustomItemRate] = useState(false);
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedUnit, setSelectedUnit] = useState('box');
+  const [customOptions, setCustomOptions] = useState([]);
   
   // Tab state
   const [tabValue, setTabValue] = useState(0);
@@ -56,10 +62,10 @@ const OrderManagement = () => {
       try {
         const token = localStorage.getItem('token');
         const response = await api.get('/admin/users', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
         const usersData = response.data;
         const usersObj = {};
         usersData.forEach((user) => {
@@ -71,6 +77,7 @@ const OrderManagement = () => {
       }
     };
     fetchUsers();
+    fetchProducts();
   }, []);
 
   useEffect(() => {
@@ -86,8 +93,19 @@ const OrderManagement = () => {
     const orderIdParam = searchParams.get('orderId');
     
     fetchOrders(orderIdParam);
-    fetchProducts();
   }, [searchParams]);
+
+  const fetchProducts = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.get('/admin/products', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setProducts(response.data);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  };
   
   const fetchOrders = async (specificOrderId = null) => {
     try {
@@ -116,15 +134,6 @@ const OrderManagement = () => {
       console.error('Error fetching orders:', err);
     } finally {
       setLoading(false);
-    }
-  };
-  
-  const fetchProducts = async () => {
-    try {
-      const response = await api.get('/products');
-      setProducts(response.data);
-    } catch (err) {
-      console.error('Error fetching products:', err);
     }
   };
   
@@ -222,7 +231,9 @@ const OrderManagement = () => {
       const formattedItems = editedOrder.items.map(item => ({
         product_id: item.product_id,
         quantity: item.quantity,
-        price_at_purchase: item.price_at_purchase
+        price_at_purchase: item.price_at_purchase,
+        selected_size: item.selected_size || null,
+        unit: item.unit || 'box'
       }));
       
       await api.put(
@@ -314,26 +325,117 @@ const OrderManagement = () => {
     }
   };
   
+  // Update selected product handlers
+  useEffect(() => {
+    if (selectedProduct) {
+      const price = selectedProduct.price;
+      setCustomItemRate(price);
+      
+      // Check if this is a mango product with sizing options
+      if (selectedProduct.category === 'mangoes') {
+        let options = [];
+        const name = selectedProduct.name.toLowerCase();
+        
+        // Detect product type and set available options
+        if (name.includes('box')) {
+          setSelectedUnit('box');
+          
+          if (name.includes('small')) {
+            options = [{ size: 'Small 2dz Box', price: selectedProduct.price }];
+          } else if (name.includes('medium')) {
+            options = [{ size: 'Medium 2dz Box', price: selectedProduct.price }];
+          } else if (name.includes('big')) {
+            options = [{ size: 'Big 2dz Box', price: selectedProduct.price }];
+          }
+        } else if (name.includes('peti')) {
+          setSelectedUnit('peti');
+          
+          if (name.includes('small')) {
+            options = [{ size: 'Small Peti (6.5-7dz)', price: selectedProduct.price }];
+          } else if (name.includes('medium')) {
+            options = [{ size: 'Medium Peti (5.5-6dz)', price: selectedProduct.price }];
+          } else if (name.includes('big')) {
+            options = [{ size: 'Big Peti (5-5.25dz)', price: selectedProduct.price }];
+          }
+        } else {
+          // Standard mango options
+          setSelectedUnit('dozen');
+          options = [
+            { size: 'Small', price: 850 },
+            { size: 'Medium', price: 1200 },
+            { size: 'Big', price: 1550 }
+          ];
+        }
+        
+        setCustomOptions(options);
+        
+        if (options.length > 0) {
+          setSelectedSize(options[0].size);
+          setCustomItemRate(options[0].price);
+        }
+      } else {
+        setCustomOptions([]);
+        setSelectedSize('');
+        setSelectedUnit('box');
+      }
+    }
+  }, [selectedProduct]);
+
   const handleOpenProductDialog = () => {
     setSelectedProduct(null);
     setProductQuantity(1);
+    setCustomItemRate(0);
+    setUseCustomItemRate(false);
+    setSelectedSize('');
+    setSelectedUnit('box');
     setProductDialogOpen(true);
   };
-  
+
   const handleCloseProductDialog = () => {
     setProductDialogOpen(false);
-    setSelectedProduct(null);
-    setProductQuantity(1);
   };
-  
+
+  const handleProductSelection = (event, newValue) => {
+    setSelectedProduct(newValue);
+  };
+
+  const handleQuantityChange = (value) => {
+    if (value < 1) return;
+    setProductQuantity(value);
+  };
+
+  const handleCustomRateChange = (e) => {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value) && value >= 0) {
+      setCustomItemRate(value);
+    }
+  };
+
+  const handleSizeChange = (event) => {
+    const newSize = event.target.value;
+    setSelectedSize(newSize);
+    
+    // Update price based on selected size
+    const option = customOptions.find(opt => opt.size === newSize);
+    if (option) {
+      setCustomItemRate(option.price);
+    }
+  };
+
   const handleAddProduct = () => {
     if (!selectedProduct || productQuantity < 1) return;
+    
+    const price = useCustomItemRate ? customItemRate : 
+                  selectedSize ? customOptions.find(opt => opt.size === selectedSize)?.price || selectedProduct.price : 
+                  selectedProduct.price;
     
     const newItem = {
       product_id: selectedProduct.id,
       quantity: productQuantity,
-      price_at_purchase: selectedProduct.price,
-      product: selectedProduct
+      price_at_purchase: price,
+      product: selectedProduct,
+      selected_size: selectedSize || null,
+      unit: selectedUnit || 'box'
     };
     
     // Add the product to the order
@@ -515,6 +617,8 @@ const OrderManagement = () => {
                       label={order.payment_status.toUpperCase()} 
                       color={getPaymentStatusColor(order.payment_status)} 
                       size="small" 
+                      className="cursor-pointer"
+                      onClick={() => handleOpenStatusDialog(order)}
                     />
                   </TableCell>
                   <TableCell>
@@ -606,17 +710,32 @@ const OrderManagement = () => {
                           sx={{ width: 100 }}
                           image={item.product.image_url}
                           alt={item.product.name}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = "https://via.placeholder.com/100?text=Image+Not+Available";
+                          }}
                         />
                         <CardContent className="flex-grow">
                           <Typography variant="subtitle1">
                             {item.product.name}
+                            {item.selected_size && (
+                              <Chip 
+                                size="small" 
+                                label={item.selected_size} 
+                                color="primary" 
+                                variant="outlined" 
+                                sx={{ ml: 1 }}
+                              />
+                            )}
                           </Typography>
                           <Box className="flex justify-between mt-2">
                             <Typography variant="body2">
                               Quantity: {item.quantity}
+                              {item.unit && item.unit !== 'box' && ` ${item.unit}`}
                             </Typography>
                             <Typography variant="body1" color="primary">
                               ₹{item.price_at_purchase.toFixed(2)}
+                              {item.unit && item.unit !== 'box' && ` per ${item.unit}`}
                             </Typography>
                           </Box>
                         </CardContent>
@@ -872,10 +991,29 @@ const OrderManagement = () => {
                                     src={item.product.image_url} 
                                     alt={item.product.name}
                                     className="w-12 h-12 object-cover mr-2"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = "https://via.placeholder.com/48?text=Image+Not+Available";
+                                    }}
                                   />
-                                  <Typography variant="body2">
-                                    {item.product.name}
-                                  </Typography>
+                                  <Box>
+                                    <Typography variant="body2">
+                                      {item.product.name}
+                                    </Typography>
+                                    {item.selected_size && (
+                                      <Chip 
+                                        size="small" 
+                                        label={item.selected_size} 
+                                        color="primary" 
+                                        variant="outlined" 
+                                      />
+                                    )}
+                                    {item.unit && item.unit !== 'box' && (
+                                      <Typography variant="caption" color="textSecondary" display="block">
+                                        Per {item.unit}
+                                      </Typography>
+                                    )}
+                                  </Box>
                                 </Box>
                               </TableCell>
                               <TableCell>
@@ -999,7 +1137,7 @@ const OrderManagement = () => {
       </Dialog>
       
       {/* Add Product Dialog */}
-      <Dialog open={productDialogOpen} onClose={handleCloseProductDialog}>
+      <Dialog open={productDialogOpen} onClose={handleCloseProductDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           Add Product to Order
         </DialogTitle>
@@ -1025,6 +1163,10 @@ const OrderManagement = () => {
                     src={option.image_url} 
                     alt={option.name}
                     className="w-10 h-10 object-cover mr-2"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://via.placeholder.com/40?text=Image+Not+Available";
+                    }}
                   />
                   <Box>
                     <Typography variant="body1">{option.name}</Typography>
@@ -1038,9 +1180,34 @@ const OrderManagement = () => {
             
             {selectedProduct && (
               <>
+                {selectedProduct.category === 'mangoes' && customOptions.length > 0 && (
+                  <Box className="mt-3 mb-1">
+                    <FormControl fullWidth size="small" margin="dense">
+                      <InputLabel>Size</InputLabel>
+                      <Select
+                        value={selectedSize}
+                        onChange={handleSizeChange}
+                        label="Size"
+                      >
+                        {customOptions.map((option) => (
+                          <MenuItem key={option.size} value={option.size}>
+                            {option.size} (₹{option.price.toFixed(2)})
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      <Typography variant="caption" color="textSecondary" sx={{ mt: 1 }}>
+                        {selectedUnit === 'dozen' ? 'Price is per dozen' : `Price is per ${selectedUnit}`}
+                      </Typography>
+                    </FormControl>
+                  </Box>
+                )}
+                
                 <Box className="flex items-center justify-between">
                   <Typography>Price:</Typography>
-                  <Typography>₹{selectedProduct.price.toFixed(2)}</Typography>
+                  <Typography>
+                    ₹{(useCustomItemRate ? customItemRate : customOptions.find(o => o.size === selectedSize)?.price || selectedProduct.price).toFixed(2)}
+                    {selectedUnit && selectedUnit !== 'box' && ` per ${selectedUnit}`}
+                  </Typography>
                 </Box>
                 
                 <Box className="flex items-center justify-between">
@@ -1078,10 +1245,39 @@ const OrderManagement = () => {
                   </Box>
                 </Box>
                 
-                <Box className="flex items-center justify-between">
+                <Box className="mt-3">
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={useCustomItemRate}
+                        onChange={(e) => setUseCustomItemRate(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Use Custom Price"
+                  />
+                  
+                  {useCustomItemRate && (
+                    <TextField
+                      label="Custom Price (₹)"
+                      type="number"
+                      value={customItemRate}
+                      onChange={handleCustomRateChange}
+                      fullWidth
+                      margin="normal"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">₹</InputAdornment>
+                        ),
+                      }}
+                    />
+                  )}
+                </Box>
+                
+                <Box className="flex items-center justify-between mt-3">
                   <Typography variant="subtitle1">Total:</Typography>
                   <Typography variant="subtitle1" color="primary">
-                    ₹{(selectedProduct.price * productQuantity).toFixed(2)}
+                    ₹{((useCustomItemRate ? customItemRate : customOptions.find(o => o.size === selectedSize)?.price || selectedProduct.price) * productQuantity).toFixed(2)}
                   </Typography>
                 </Box>
               </>
@@ -1107,4 +1303,3 @@ const OrderManagement = () => {
 };
 
 export default OrderManagement;
-

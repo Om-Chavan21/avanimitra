@@ -92,15 +92,25 @@ async def create_order(
 
         product = serialize_doc_id(product)
 
+        # Use custom price if provided, otherwise use product price
+        price_at_purchase = getattr(item, 'price_per_unit', None) or product["price"]
+        
         # Add item to order
         order_item = {
             "product_id": item.product_id,
             "quantity": item.quantity,
-            "price_at_purchase": product["price"],
+            "price_at_purchase": price_at_purchase,
         }
+        
+        # Add custom fields if they exist
+        if hasattr(item, 'selected_size') and item.selected_size:
+            order_item["selected_size"] = item.selected_size
+            
+        if hasattr(item, 'unit') and item.unit:
+            order_item["unit"] = item.unit
 
         items.append(order_item)
-        total_amount += product["price"] * item.quantity
+        total_amount += price_at_purchase * item.quantity
 
     order["items"] = items
     order["total_amount"] = total_amount

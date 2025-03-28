@@ -1,3 +1,4 @@
+// frontend/src/pages/OrderDetails.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -157,18 +158,47 @@ const OrderDetails = () => {
                   image={item.product.image_url}
                   alt={item.product.name}
                   className="object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://via.placeholder.com/140?text=Image+Not+Available";
+                  }}
                 />
                 <CardContent className="flex-grow">
-                  <Typography variant="h6">{item.product.name}</Typography>
+                  <Box className="mb-2">
+                    <Typography variant="h6">{item.product.name}</Typography>
+                    {item.selected_size && (
+                      <Chip 
+                        size="small" 
+                        label={item.selected_size} 
+                        color="primary" 
+                        variant="outlined"
+                      />
+                    )}
+                  </Box>
                   <Typography variant="body2" color="text.secondary" paragraph className="line-clamp-2">
                     {item.product.description}
                   </Typography>
                   <Box className="flex justify-between items-center">
                     <Typography variant="body1">
                       Quantity: {item.quantity}
+                      {item.unit && item.unit !== 'box' && (
+                        <Typography component="span" variant="body2" color="text.secondary">
+                          {` ${item.unit}${item.quantity > 1 ? 's' : ''}`}
+                        </Typography>
+                      )}
                     </Typography>
                     <Typography variant="body1" color="primary">
                       ₹{item.price_at_purchase.toFixed(2)}
+                      {item.unit && item.unit !== 'box' && (
+                        <Typography component="span" variant="body2" color="text.secondary">
+                          {`/${item.unit}`}
+                        </Typography>
+                      )}
+                    </Typography>
+                  </Box>
+                  <Box className="flex justify-end mt-2">
+                    <Typography variant="body1" fontWeight="500">
+                      Subtotal: ₹{(item.price_at_purchase * item.quantity).toFixed(2)}
                     </Typography>
                   </Box>
                 </CardContent>

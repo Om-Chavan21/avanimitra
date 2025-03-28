@@ -1,3 +1,4 @@
+# backend/database.py
 import motor.motor_asyncio
 from os import environ
 from dotenv import load_dotenv
@@ -45,15 +46,21 @@ async def get_user_cart(user_id):
     return serialize_doc_id(cart)
 
 
-async def add_to_cart(user_id, product_id, quantity=1):
+async def add_to_cart(user_id, product_id, quantity=1, selected_size=None, price_per_unit=None, unit="box"):
     cart = await get_user_cart(user_id)
 
-    # Check if item already exists in cart
+    # Check if item with same product_id and selected_size already exists in cart
     found = False
     if "items" in cart:
         for item in cart["items"]:
-            if item["product_id"] == product_id:
+            if (item["product_id"] == product_id and
+                item.get("selected_size") == selected_size):
                 item["quantity"] += quantity
+                # Keep existing custom price if it exists
+                if price_per_unit is not None:
+                    item["price_per_unit"] = price_per_unit
+                if unit:
+                    item["unit"] = unit
                 found = True
                 break
 
@@ -61,7 +68,16 @@ async def add_to_cart(user_id, product_id, quantity=1):
     if not found:
         if "items" not in cart:
             cart["items"] = []
-        cart["items"].append({"product_id": product_id, "quantity": quantity})
+        
+        new_item = {"product_id": product_id, "quantity": quantity}
+        if selected_size:
+            new_item["selected_size"] = selected_size
+        if price_per_unit is not None:
+            new_item["price_per_unit"] = price_per_unit
+        if unit:
+            new_item["unit"] = unit
+            
+        cart["items"].append(new_item)
 
     # Update cart in database
     await carts_collection.update_one(
@@ -71,18 +87,50 @@ async def add_to_cart(user_id, product_id, quantity=1):
     return cart
 
 
-async def update_cart_item(user_id, product_id, quantity):
+async def update_cart_item(user_id, product_id, quantity, selected_size=None, price_per_unit=None, unit=None):
     if quantity <= 0:
-        # Remove item if quantity is 0 or negative
-        await carts_collection.update_one(
-            {"user_id": user_id}, {"$pull": {"items": {"product_id": product_id}}}
-        )
+        # If selected_size is provided, only remove the specific item with that size
+        if selected_size:
+            await carts_collection.update_one(
+                {"user_id": user_id}, 
+                {"$pull": {"items": {"product_id": product_id, "selected_size": selected_size}}}
+            )
+        else:
+            # Remove all items with this product_id
+            await carts_collection.update_one(
+                {"user_id": user_id}, 
+                {"$pull": {"items": {"product_id": product_id}}}
+            )
     else:
-        # Update quantity
-        await carts_collection.update_one(
-            {"user_id": user_id, "items.product_id": product_id},
-            {"$set": {"items.$.quantity": quantity}},
-        )
+        # Update quantity and other fields if provided
+        update_fields = {"items.$.quantity": quantity}
+        
+        if price_per_unit is not None:
+            update_fields["items.$.price_per_unit"] = price_per_unit
+            
+        if unit:
+            update_fields["items.$.unit"] = unit
+            
+        # Find and update the specific item (by product_id and selected_size if provided)
+        match_condition = {"user_id": user_id}
+        
+        if selected_size:
+            match_condition["items"] = {
+                "$elemMatch": {
+                    "product_id": product_id,
+                    "selected_size": selected_size
+                }
+            }
+            await carts_collection.update_one(
+                match_condition,
+                {"$set": update_fields}
+            )
+        else:
+            # Update by product_id only
+            await carts_collection.update_one(
+                {"user_id": user_id, "items.product_id": product_id},
+                {"$set": update_fields}
+            )
 
     return await get_user_cart(user_id)
 

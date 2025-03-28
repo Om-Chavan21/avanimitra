@@ -80,19 +80,33 @@ class ProductUpdate(BaseModel):
     status: Optional[str] = None
 
 
+# At the top of the file, add:
+class ProductOption(BaseModel):
+    size: str
+    price: float
+
+
 class ProductResponse(ProductBase):
     id: str
+    has_custom_options: Optional[bool] = False
+    custom_options: Optional[List[ProductOption]] = []
 
 
 class CartItem(BaseModel):
     product_id: str
     quantity: int
+    selected_size: Optional[str] = None
+    price_per_unit: Optional[float] = None
+    unit: Optional[str] = 'box'
 
 
 class CartItemResponse(BaseModel):
     product_id: str
     product: ProductResponse
     quantity: int
+    selected_size: Optional[str] = None
+    pricePerUnit: Optional[float] = None
+    unit: Optional[str] = 'box'
 
 
 class CartResponse(BaseModel):
@@ -118,7 +132,9 @@ class PaymentStatus(str, Enum):
 class OrderItemBase(BaseModel):
     product_id: str
     quantity: int
-    price_at_purchase: float
+    price_at_purchase: Optional[float] = None
+    selected_size: Optional[str] = None
+    unit: Optional[str] = 'box'
 
 
 class OrderCreate(BaseModel):

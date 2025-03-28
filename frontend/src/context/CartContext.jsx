@@ -1,3 +1,4 @@
+// frontend/src/context/CartContext.jsx
 import { createContext, useState, useContext, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import api from '../utils/api';
@@ -43,11 +44,17 @@ export const CartProvider = ({ children }) => {
     fetchCart();
   }, [isAuthenticated]);
 
-  const addToCart = async (productId, quantity = 1) => {
+  const addToCart = async (productId, quantity = 1, customOptions = {}) => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.post('/cart/items', 
-        { product_id: productId, quantity },
+        { 
+          product_id: productId, 
+          quantity,
+          selected_size: customOptions?.selectedSize || null,
+          price_per_unit: customOptions?.pricePerUnit || null,
+          unit: customOptions?.unit || 'box'
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -64,11 +71,17 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const updateCartItem = async (productId, quantity) => {
+  const updateCartItem = async (productId, quantity, customOptions = {}) => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.put(`/cart/items/${productId}`, 
-        { product_id: productId, quantity },
+        { 
+          product_id: productId, 
+          quantity,
+          selected_size: customOptions?.selectedSize || null,
+          price_per_unit: customOptions?.pricePerUnit || null,
+          unit: customOptions?.unit || 'box'
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`

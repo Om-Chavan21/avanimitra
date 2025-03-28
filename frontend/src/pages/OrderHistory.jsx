@@ -1,10 +1,12 @@
+// frontend/src/pages/OrderHistory.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Container, Typography, Box, Paper, Tab, Tabs, CircularProgress,
+  Container, Typography, Box, Paper, Button, Grid,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Button, Chip, Alert, Dialog, DialogTitle, DialogContent, 
-  DialogActions, TextField, InputAdornment, Grid
+  Chip, Tab, Tabs, Divider, Card, CardContent, CardMedia, Alert,
+  TextField, Dialog, DialogTitle, DialogContent, DialogActions, InputAdornment, 
+  CircularProgress
 } from '@mui/material';
 import api from '../utils/api';
 import { format } from 'date-fns';
@@ -109,7 +111,10 @@ const OrderHistory = () => {
         receiver_phone: receiverPhone,
         items: selectedOrder.items.map(item => ({
           product_id: item.product_id,
-          quantity: item.quantity
+          quantity: item.quantity,
+          selected_size: item.selected_size,
+          price_per_unit: item.price_at_purchase,
+          unit: item.unit || 'box'
         }))
       };
       
@@ -234,10 +239,21 @@ const OrderHistory = () => {
                               src={item.product.image_url} 
                               alt={item.product.name}
                               className="w-10 h-10 object-cover mr-2"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = "https://via.placeholder.com/40?text=Image+Not+Available";
+                              }}
                             />
-                            <Typography variant="body2">
-                              {item.product.name}
-                            </Typography>
+                            <Box>
+                              <Typography variant="body2">
+                                {item.product.name}
+                              </Typography>
+                              {item.selected_size && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {item.selected_size}
+                                </Typography>
+                              )}
+                            </Box>
                           </Box>
                         </TableCell>
                         <TableCell align="center">{item.quantity}</TableCell>
@@ -378,7 +394,7 @@ const OrderCard = ({ order, getStatusColor, getPaymentStatusColor, formatDate, s
                 e.stopPropagation();
                 onRepeatOrder();
               }}
-              size="small "
+              size="small"
             >
               Repeat Order
             </Button>
@@ -419,7 +435,14 @@ const OrderCard = ({ order, getStatusColor, getPaymentStatusColor, formatDate, s
                   <TableBody>
                     {order.items.map((item, i) => (
                       <TableRow key={i}>
-                        <TableCell>{item.product.name}</TableCell>
+                        <TableCell>
+                          {item.product.name}
+                          {item.selected_size && (
+                            <Typography variant="caption" display="block" color="text.secondary">
+                              {item.selected_size}
+                            </Typography>
+                          )}
+                        </TableCell>
                         <TableCell align="right">{item.quantity}</TableCell>
                         <TableCell align="right">₹{(item.price_at_purchase * item.quantity).toFixed(2)}</TableCell>
                       </TableRow>

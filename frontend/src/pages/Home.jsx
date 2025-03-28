@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+// frontend/src/pages/Home.jsx
+import { useState, useEffect, useRef } from 'react';
 import { 
   Container, Typography, Box, Grid, CircularProgress, 
   Paper, Button, Card, CardMedia, CardContent, useTheme
 } from '@mui/material';
-import ProductCard from '../components/ProductCard';
+import ProductCategory from '../components/ProductCategory';
 import api from '../utils/api';
 import heroImage from '../assets/hero-bg.jpg';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { styled } from '@mui/material/styles';
@@ -29,8 +30,10 @@ const Home = () => {
   const [error, setError] = useState('');
   const { isAuthenticated } = useAuth();
   const theme = useTheme();
+  const productsRef = useRef(null);
 
   useEffect(() => {
+    // Reset scroll position on page load
     window.scrollTo(0, 0);
   }, []);
 
@@ -49,6 +52,17 @@ const Home = () => {
 
     fetchProducts();
   }, []);
+
+  // Separate products by category
+  const mangoes = products.filter(product => product.category === 'mangoes');
+  const otherProducts = products.filter(product => product.category !== 'mangoes');
+
+  // Scroll to products section
+  const scrollToProducts = () => {
+    if (productsRef.current) {
+      productsRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <div>
@@ -87,8 +101,7 @@ const Home = () => {
               variant="contained" 
               size="large" 
               color="secondary"
-              component={Link}
-              to={isAuthenticated ? "/cart" : "/login"}
+              onClick={scrollToProducts}
               endIcon={<ShoppingCartIcon />}
               sx={{
                 fontWeight: 'bold',
@@ -104,10 +117,13 @@ const Home = () => {
 
       {/* Products Section */}
       <Box 
+        ref={productsRef}
+        id="products"
         sx={{
           py: 8,
           px: 2,
-          bgcolor: theme.palette.background.default
+          bgcolor: theme.palette.background.default,
+          scrollMarginTop: '80px', // Ensures the section title is visible when scrolled to
         }}
       >
         <Container maxWidth="xl">
@@ -118,9 +134,13 @@ const Home = () => {
             <Button 
               variant="contained" 
               color="primary"
-              component={Link}
+              component={RouterLink}
               to={isAuthenticated ? "/cart" : "/login"}
-              endIcon={<ShoppingCartIcon />}
+              sx={{ 
+                display: { xs: 'none', sm: 'flex' },
+                minHeight: '36px',
+                whiteSpace: 'nowrap'
+              }}
             >
               Click to Order
             </Button>
@@ -131,23 +151,23 @@ const Home = () => {
             ensuring you get the healthiest, most flavorful produce possible.
           </Typography>
 
-          {loading ? (
-            <Box display="flex" justifyContent="center" p={4}>
-              <CircularProgress />
-            </Box>
-          ) : error ? (
-            <Paper className="p-4 text-center text-red-500">
-              {error}
-            </Paper>
-          ) : (
-            <Grid container spacing={4}>
-              {products.map((product) => (
-                <Grid item key={product.id} xs={12} sm={6} md={4} lg={3}>
-                  <ProductCard product={product} />
-                </Grid>
-              ))}
-            </Grid>
-          )}
+          {/* Seasonal Mangoes Section */}
+          <ProductCategory 
+            title="Seasonal Mangoes" 
+            products={mangoes} 
+            loading={loading} 
+            error={error}
+            id="mangoes"
+          />
+
+          {/* Other Organic Products */}
+          <ProductCategory 
+            title="Other Organic Products" 
+            products={otherProducts} 
+            loading={loading} 
+            error={error}
+            id="other-products"
+          />
         </Container>
       </Box>
 
@@ -209,43 +229,13 @@ const Home = () => {
           <Typography variant="h3" component="h2" align="center" gutterBottom>
             About Avani Mitra
           </Typography>
-          {/* <Typography variant="body1" paragraph className="text-center mb-8">
-            Avani Mitra is dedicated to cultivating the finest organic fruits using sustainable 
-            farming practices that respect our environment and promote biodiversity.
-          </Typography>
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={4}>
-              <Box className="text-center">
-                <Typography variant="h6" gutterBottom>Organic Certified</Typography>
-                <Typography variant="body2">
-                  All our produce is certified organic, meeting the strictest standards in the industry.
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Box className="text-center">
-                <Typography variant="h6" gutterBottom>Farm to Table</Typography>
-                <Typography variant="body2">
-                  We deliver directly from our farms to your doorstep, ensuring maximum freshness.
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Box className="text-center">
-                <Typography variant="h6" gutterBottom>Sustainable Practices</Typography>
-                <Typography variant="body2">
-                  Our farming methods preserve soil health and promote ecological balance.
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid> */}
           
           <Box className="mt-8 text-center">
             <Button 
               variant="contained" 
               color="primary" 
               size="large"
-              component={Link}
+              component={RouterLink}
               to="/about"
             >
               Learn More About Us

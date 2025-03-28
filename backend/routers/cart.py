@@ -1,3 +1,4 @@
+# backend/routers/cart.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from bson import ObjectId
@@ -31,13 +32,19 @@ async def get_cart(current_user: UserInDB = Depends(get_current_user)):
             )
             if product:
                 product = serialize_doc_id(product)
+                # Get price from item if it has custom price
+                price_per_unit = item.get("price_per_unit", product["price"])
+                
                 cart_item = CartItemResponse(
                     product_id=item["product_id"],
                     product=ProductResponse(**product),
                     quantity=item["quantity"],
+                    selected_size=item.get("selected_size"),
+                    pricePerUnit=price_per_unit,
+                    unit=item.get("unit", "box")
                 )
                 items.append(cart_item)
-                total_price += product["price"] * item["quantity"]
+                total_price += price_per_unit * item["quantity"]
 
     return CartResponse(items=items, total_price=total_price)
 
@@ -53,8 +60,15 @@ async def add_item_to_cart(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
 
-    # Add to cart
-    await add_to_cart(current_user.id, item.product_id, item.quantity)
+    # Add to cart with custom options
+    await add_to_cart(
+        current_user.id, 
+        item.product_id, 
+        item.quantity,
+        item.selected_size,
+        item.price_per_unit,
+        item.unit
+    )
 
     # Return updated cart
     return await get_cart(current_user)
@@ -71,8 +85,15 @@ async def update_item_in_cart(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
 
-    # Update cart item
-    await update_cart_item(current_user.id, product_id, item.quantity)
+    # Update cart item with custom options
+    await update_cart_item(
+        current_user.id, 
+        product_id, 
+        item.quantity,
+        item.selected_size,
+        item.price_per_unit,
+        item.unit
+    )
 
     # Return updated cart
     return await get_cart(current_user)

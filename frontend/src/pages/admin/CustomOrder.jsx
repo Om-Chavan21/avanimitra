@@ -1,3 +1,4 @@
+// frontend/src/pages/admin/CustomOrder.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -5,7 +6,8 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, CircularProgress, Autocomplete, InputAdornment,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert,
-  FormControl, InputLabel, Select, MenuItem, Divider, Switch, FormControlLabel
+  FormControl, InputLabel, Select, MenuItem, Divider, Switch, FormControlLabel,
+  Chip, Tooltip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -46,6 +48,9 @@ const CustomOrder = () => {
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [customItemRate, setCustomItemRate] = useState(0);
   const [useCustomItemRate, setUseCustomItemRate] = useState(false);
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedUnit, setSelectedUnit] = useState('box');
+  const [customOptions, setCustomOptions] = useState([]);
 
   // New user dialog
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
@@ -122,6 +127,62 @@ const CustomOrder = () => {
     }
   }, [selectedUser]);
 
+  // Update custom options when product changes
+  useEffect(() => {
+    if (selectedProduct) {
+      const price = selectedProduct.price;
+      setCustomItemRate(price);
+      
+      // Check if this is a mango product with sizing options
+      if (selectedProduct.category === 'mangoes') {
+        let options = [];
+        const name = selectedProduct.name.toLowerCase();
+        
+        // Detect product type and set available options
+        if (name.includes('box')) {
+          setSelectedUnit('box');
+          
+          if (name.includes('small')) {
+            options = [{ size: 'Small 2dz Box', price: selectedProduct.price }];
+          } else if (name.includes('medium')) {
+            options = [{ size: 'Medium 2dz Box', price: selectedProduct.price }];
+          } else if (name.includes('big')) {
+            options = [{ size: 'Big 2dz Box', price: selectedProduct.price }];
+          }
+        } else if (name.includes('peti')) {
+          setSelectedUnit('peti');
+          
+          if (name.includes('small')) {
+            options = [{ size: 'Small Peti (6.5-7dz)', price: selectedProduct.price }];
+          } else if (name.includes('medium')) {
+            options = [{ size: 'Medium Peti (5.5-6dz)', price: selectedProduct.price }];
+          } else if (name.includes('big')) {
+            options = [{ size: 'Big Peti (5-5.25dz)', price: selectedProduct.price }];
+          }
+        } else {
+          // Standard mango options
+          setSelectedUnit('dozen');
+          options = [
+            { size: 'Small', price: 850 },
+            { size: 'Medium', price: 1200 },
+            { size: 'Big', price: 1550 }
+          ];
+        }
+        
+        setCustomOptions(options);
+        
+        if (options.length > 0) {
+          setSelectedSize(options[0].size);
+          setCustomItemRate(options[0].price);
+        }
+      } else {
+        setCustomOptions([]);
+        setSelectedSize('');
+        setSelectedUnit('box');
+      }
+    }
+  }, [selectedProduct]);
+
   const handleUserChange = (event, newValue) => {
     setSelectedUser(newValue);
   };
@@ -139,6 +200,8 @@ const CustomOrder = () => {
     setSelectedQuantity(1);
     setCustomItemRate(0);
     setUseCustomItemRate(false);
+    setSelectedSize('');
+    setSelectedUnit('box');
     setProductDialogOpen(true);
   };
 
@@ -148,9 +211,6 @@ const CustomOrder = () => {
 
   const handleProductSelection = (event, newValue) => {
     setSelectedProduct(newValue);
-    if (newValue) {
-      setCustomItemRate(newValue.price);
-    }
   };
 
   const handleQuantityChange = (value) => {
@@ -165,18 +225,31 @@ const CustomOrder = () => {
     }
   };
 
+  const handleSizeChange = (event) => {
+    const newSize = event.target.value;
+    setSelectedSize(newSize);
+    
+    // Update price based on selected size
+    const option = customOptions.find(opt => opt.size === newSize);
+    if (option) {
+      setCustomItemRate(option.price);
+    }
+  };
+
   const handleAddProductToOrder = () => {
     if (!selectedProduct) return;
 
-    const price = useCustomItemRate ? customItemRate : selectedProduct.price;
+    const price = useCustomItemRate ? customItemRate : 
+                  selectedSize ? customOptions.find(opt => opt.size === selectedSize)?.price || selectedProduct.price : 
+                  selectedProduct.price;
 
-    // Check if product already exists in order
-    const existingItemIndex = orderItems.findIndex(
-      item => item.product_id === selectedProduct.id
+    // Check if product already exists in order with the same size option
+    const existingItemIndex = orderItems.findIndex(item => 
+      item.product_id === selectedProduct.id && item.selected_size === selectedSize
     );
 
     if (existingItemIndex >= 0) {
-      // Update quantity if product already exists
+      // Update quantity if product already exists with the same size
       const updatedItems = [...orderItems];
       updatedItems[existingItemIndex].quantity += selectedQuantity;
       setOrderItems(updatedItems);
@@ -189,7 +262,9 @@ const CustomOrder = () => {
           product: selectedProduct,
           quantity: selectedQuantity,
           price: price,
-          custom_price: useCustomItemRate
+          custom_price: useCustomItemRate,
+          selected_size: selectedSize,
+          unit: selectedUnit
         }
       ]);
     }
@@ -274,6 +349,15 @@ const CustomOrder = () => {
             }
           : {};
       
+      // Format items for API
+      const itemsForApi = orderItems.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price_at_purchase: item.price,
+        selected_size: item.selected_size || null,
+        unit: item.unit || 'box'
+      }));
+      
       await api.post(
         '/admin/custom-orders',
         {
@@ -282,11 +366,7 @@ const CustomOrder = () => {
           receiver_phone: orderDetails.receiver_phone,
           payment_status: orderDetails.payment_status,
           order_status: orderDetails.order_status,
-          items: orderItems.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            price_at_purchase: item.price
-          })),
+          items: itemsForApi,
           ...discountInfo,
           total_amount: totalAmount
         },
@@ -461,11 +541,23 @@ const CustomOrder = () => {
                                 src={item.product.image_url} 
                                 alt={item.product.name}
                                 className="w-12 h-12 object-cover mr-2"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = "https://via.placeholder.com/48?text=Image+Not+Available";
+                                }}
                               />
                               <Box>
                                 <Typography variant="body2">
                                   {item.product.name}
                                 </Typography>
+                                {item.selected_size && (
+                                  <Chip 
+                                    size="small" 
+                                    label={item.selected_size} 
+                                    color="primary" 
+                                    variant="outlined" 
+                                  />
+                                )}
                                 <Typography variant="caption" color="textSecondary">
                                   Stock: {item.product.stock_quantity}
                                 </Typography>
@@ -482,6 +574,11 @@ const CustomOrder = () => {
                               <Typography color="primary">₹{item.price.toFixed(2)}</Typography>
                             ) : (
                               <Typography>₹{item.price.toFixed(2)}</Typography>
+                            )}
+                            {item.unit && item.unit !== 'box' && (
+                              <Typography variant="caption" color="textSecondary">
+                                per {item.unit}
+                              </Typography>
                             )}
                           </TableCell>
                           <TableCell align="center">
@@ -740,6 +837,10 @@ const CustomOrder = () => {
                     src={option.image_url} 
                     alt={option.name}
                     className="w-10 h-10 object-cover mr-2"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://via.placeholder.com/40?text=Image+Not+Available";
+                    }}
                   />
                   <Box>
                     <Typography variant="body1">{option.name}</Typography>
@@ -754,6 +855,28 @@ const CustomOrder = () => {
 
           {selectedProduct && (
             <>
+              {selectedProduct.category === 'mangoes' && customOptions.length > 0 && (
+                <Box className="mt-3 mb-1">
+                  <FormControl fullWidth size="small" margin="dense">
+                    <InputLabel>Size</InputLabel>
+                    <Select
+                      value={selectedSize}
+                      onChange={handleSizeChange}
+                      label="Size"
+                    >
+                      {customOptions.map((option) => (
+                        <MenuItem key={option.size} value={option.size}>
+                          {option.size} (₹{option.price.toFixed(2)})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="textSecondary" sx={{ mt: 1 }}>
+                      {selectedUnit === 'dozen' ? 'Price is per dozen' : `Price is per ${selectedUnit}`}
+                    </Typography>
+                  </FormControl>
+                </Box>
+              )}
+              
               <Box className="mt-4">
                 <Typography variant="subtitle2" gutterBottom>
                   Quantity: (Available: {selectedProduct.stock_quantity})
@@ -823,10 +946,11 @@ const CustomOrder = () => {
               
               <Box className="mt-4 flex justify-between">
                 <Typography>
-                  Price: ₹{useCustomItemRate ? customItemRate.toFixed(2) : selectedProduct.price.toFixed(2)}
+                  Price: ₹{(useCustomItemRate ? customItemRate : customOptions.find(o => o.size === selectedSize)?.price || selectedProduct.price).toFixed(2)}
+                  {selectedUnit && selectedUnit !== 'box' && ` per ${selectedUnit}`}
                 </Typography>
                 <Typography>
-                  Subtotal: ₹{(useCustomItemRate ? customItemRate : selectedProduct.price * selectedQuantity).toFixed(2)}
+                  Subtotal: ₹{((useCustomItemRate ? customItemRate : customOptions.find(o => o.size === selectedSize)?.price || selectedProduct.price) * selectedQuantity).toFixed(2)}
                 </Typography>
               </Box>
               

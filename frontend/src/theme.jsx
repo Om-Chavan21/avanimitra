@@ -1,7 +1,8 @@
-import { createTheme } from '@mui/material/styles';
+// frontend/src/theme.jsx
+import { createTheme, responsiveFontSizes } from '@mui/material/styles';
 
 // Color palette option 2: Pear green and Dark Pastel green
-export const theme = createTheme({
+let theme = createTheme({
   palette: {
     primary: {
       main: '#45B649',
@@ -40,21 +41,27 @@ export const theme = createTheme({
     fontFamily: '"Poppins", "Roboto", "Helvetica", "Arial", sans-serif',
     h1: {
       fontWeight: 700,
+      fontSize: '2.5rem', // Smaller base size for better mobile scaling
     },
     h2: {
       fontWeight: 700,
+      fontSize: '2.0rem',
     },
     h3: {
       fontWeight: 600,
+      fontSize: '1.75rem',
     },
     h4: {
       fontWeight: 600,
+      fontSize: '1.5rem',
     },
     h5: {
       fontWeight: 500,
+      fontSize: '1.25rem',
     },
     h6: {
       fontWeight: 500,
+      fontSize: '1.1rem',
     },
     button: {
       fontWeight: 500,
@@ -101,7 +108,30 @@ export const theme = createTheme({
         },
       },
     },
+    // Mobile-specific adjustments
+    MuiContainer: {
+      styleOverrides: {
+        root: {
+          '@media (max-width:600px)': {
+            padding: '0 12px',
+          },
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          '@media (max-width:600px)': {
+            padding: '8px',
+          },
+        },
+      },
+    },
   },
 });
 
+// Make typography responsive
+theme = responsiveFontSizes(theme);
+
+export { theme };
 export default theme;
