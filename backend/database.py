@@ -1,13 +1,14 @@
 import motor.motor_asyncio
 from os import environ
+import os
 from dotenv import load_dotenv
 from bson import ObjectId
 from datetime import datetime
 
 load_dotenv()
 
-MONGODB_URI = environ.get("MONGODB_URI")
-DATABASE_NAME = environ.get("DATABASE_NAME")
+MONGODB_URI = os.getenv("MONGODB_URI")
+DATABASE_NAME = os.getenv("DATABASE_NAME")
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URI)
 database = client[DATABASE_NAME]
 
@@ -49,7 +50,7 @@ async def get_user_cart(user_id):
 async def add_to_cart(user_id, item_data):
     cart = await get_user_cart(user_id)
     product_id = item_data["product_id"]
-    
+
     # Check if item already exists in cart
     found = False
     if "items" in cart:
@@ -58,11 +59,14 @@ async def add_to_cart(user_id, item_data):
                 # Check if the selected_option is the same
                 same_option = True
                 if "selected_option" in item_data:
-                    if "selected_option" not in item or item["selected_option"] != item_data["selected_option"]:
+                    if (
+                        "selected_option" not in item
+                        or item["selected_option"] != item_data["selected_option"]
+                    ):
                         same_option = False
                 elif "selected_option" in item:
                     same_option = False
-                
+
                 if same_option:
                     # Update quantity if same product and option
                     cart["items"][idx]["quantity"] += item_data["quantity"]
@@ -85,11 +89,11 @@ async def add_to_cart(user_id, item_data):
 
 async def update_cart_item(user_id, product_id, update_data):
     quantity = update_data.get("quantity", 0)
-    
+
     # Find the cart and item
     cart = await get_user_cart(user_id)
     items = cart.get("items", [])
-    
+
     if quantity <= 0:
         # Remove item if quantity is 0 or negative
         await carts_collection.update_one(
@@ -104,7 +108,7 @@ async def update_cart_item(user_id, product_id, update_data):
                     items[idx]["quantity"] = quantity
                     items[idx]["selected_option"] = update_data["selected_option"]
                     break
-            
+
             # Update the entire items array
             await carts_collection.update_one(
                 {"user_id": user_id}, {"$set": {"items": items}}
@@ -113,10 +117,11 @@ async def update_cart_item(user_id, product_id, update_data):
             # Just update quantity
             await carts_collection.update_one(
                 {"user_id": user_id, "items.product_id": product_id},
-                {"$set": {"items.$.quantity": quantity}}
+                {"$set": {"items.$.quantity": quantity}},
             )
 
     return await get_user_cart(user_id)
+
 
 async def clear_cart(user_id):
     await carts_collection.update_one({"user_id": user_id}, {"$set": {"items": []}})
@@ -133,7 +138,7 @@ async def get_payment_settings():
             "account_number": "0490104000173407",
             "ifsc_code": "IBKL0000490",
             "upi_id": "acdatar-3@okhdfcbank",
-            "gpay_number": "9764814452"
+            "gpay_number": "9764814452",
         }
         await payment_settings_collection.insert_one(default_settings)
         return default_settings
