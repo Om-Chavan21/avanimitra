@@ -156,7 +156,10 @@ const Footer = () => {
         
         <Box mt={5} textAlign="center">
           <Typography variant="body2" color="text.secondary">
-            © {currentYear} Avani Mitra | All rights reserved.
+            &copy; {currentYear} Avani Mitra | All rights reserved.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Developed by Om Chavan
           </Typography>
         </Box>
       </Container>

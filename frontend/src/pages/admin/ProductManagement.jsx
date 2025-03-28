@@ -4,11 +4,13 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
   CircularProgress, FormControl, InputLabel, Select, MenuItem, Alert,
-  Card, CardMedia
+  Card, CardMedia, Checkbox, FormControlLabel, FormHelperText,
+  Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import api from '../../utils/api';
 
 const ProductManagement = () => {
@@ -27,7 +29,10 @@ const ProductManagement = () => {
     stock_quantity: '',
     category: '',
     image_url: '',
-    status: ''
+    status: '',
+    is_seasonal: false,
+    has_price_options: false,
+    price_options: []
   });
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,6 +49,52 @@ const ProductManagement = () => {
   
   // Product statuses
   const statuses = ['active', 'inactive', 'out_of_stock'];
+  
+  // Initial price options for mangoes
+  const defaultMangoOptions = {
+    small: [
+      {
+        type: 'box',
+        size: 'small',
+        quantity: '6.5/7 Dz',
+        price: 5300
+      },
+      {
+        type: 'quantity',
+        size: 'small',
+        quantity: '1 Dz',
+        price: 850
+      }
+    ],
+    medium: [
+      {
+        type: 'box',
+        size: 'medium',
+        quantity: '5.5/6 Dz',
+        price: 6300
+      },
+      {
+        type: 'quantity',
+        size: 'medium',
+        quantity: '1 Dz',
+        price: 1200
+      }
+    ],
+    big: [
+      {
+        type: 'box',
+        size: 'big',
+        quantity: '5/5.25 Dz',
+        price: 7400
+      },
+      {
+        type: 'quantity',
+        size: 'big',
+        quantity: '1 Dz',
+        price: 1550
+      }
+    ]
+  };
   
   useEffect(() => {
     fetchProducts();
@@ -78,8 +129,11 @@ const ProductManagement = () => {
         price: product.price.toString(),
         stock_quantity: product.stock_quantity.toString(),
         category: product.category,
-        image_url: product.image_url,
-        status: product.status
+        image_url: product. image_url,
+        status: product.status,
+        is_seasonal: product.is_seasonal || false,
+        has_price_options: product.has_price_options || false,
+        price_options: product.price_options || []
       });
     } else {
       setFormData({
@@ -89,7 +143,10 @@ const ProductManagement = () => {
         stock_quantity: '',
         category: '',
         image_url: '',
-        status: 'active'
+        status: 'active',
+        is_seasonal: false,
+        has_price_options: false,
+        price_options: []
       });
     }
     setFormErrors({});
@@ -101,10 +158,47 @@ const ProductManagement = () => {
   };
   
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, checked, type } = e.target;
+    
+    // Special handling for checkbox
+    const newValue = type === 'checkbox' ? checked : value;
+    
+    // For mango products, set up default price options when category changes to mangoes
+    if (name === 'category' && value === 'mangoes' && !formData.has_price_options) {
+      // Suggest enabling price options for mangoes
+      setFormData({
+        ...formData,
+        [name]: value,
+        is_seasonal: true
+      });
+      return;
+    }
+    
+    // When has_price_options is turned on
+    if (name === 'has_price_options' && checked && formData.price_options.length === 0) {
+      // Set default options based on category
+      if (formData.category === 'mangoes') {
+        // For mangoes, determine size from name
+        let size = 'medium'; // default
+        if (formData.name.toLowerCase().includes('small')) {
+          size = 'small';
+        } else if (formData.name.toLowerCase().includes('big')) {
+          size = 'big';
+        }
+        
+        setFormData({
+          ...formData,
+          has_price_options: true,
+          is_seasonal: true,
+          price_options: defaultMangoOptions[size] || []
+        });
+        return;
+      }
+    }
+    
     setFormData({
       ...formData,
-      [name]: value
+      [name]: newValue
     });
     
     // Clear the error for this field
@@ -114,6 +208,43 @@ const ProductManagement = () => {
         [name]: ''
       });
     }
+  };
+  
+  const handlePriceOptionChange = (index, field, value) => {
+    const updatedOptions = [...formData.price_options];
+    updatedOptions[index] = {
+      ...updatedOptions[index],
+      [field]: field === 'price' ? parseFloat(value) : value
+    };
+    
+    setFormData({
+      ...formData,
+      price_options: updatedOptions
+    });
+  };
+  
+  const addPriceOption = () => {
+    const newOption = {
+      type: 'box', // default type
+      size: formData.category === 'mangoes' ? 'medium' : '',
+      quantity: '',
+      price: parseFloat(formData.price) || 0
+    };
+    
+    setFormData({
+      ...formData,
+      price_options: [...formData.price_options, newOption]
+    });
+  };
+  
+  const removePriceOption = (index) => {
+    const updatedOptions = [...formData.price_options];
+    updatedOptions.splice(index, 1);
+    
+    setFormData({
+      ...formData,
+      price_options: updatedOptions
+    });
   };
   
   const validateForm = () => {
@@ -131,6 +262,10 @@ const ProductManagement = () => {
     if (!formData.category) errors.category = 'Category is required';
     if (!formData.image_url.trim()) errors.image_url = 'Image URL is required';
     if (!formData.status) errors.status = 'Status is required';
+    
+    if (formData.has_price_options && formData.price_options.length === 0) {
+      errors.price_options = 'At least one price option is required';
+    }
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -250,6 +385,7 @@ const ProductManagement = () => {
                 <TableCell align="right">Price (₹)</TableCell>
                 <TableCell align="right">Stock</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Type</TableCell>
                 <TableCell align="center">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -269,7 +405,13 @@ const ProductManagement = () => {
                   </TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.category}</TableCell>
-                  <TableCell align="right">{product.price.toFixed(2)}</TableCell>
+                  <TableCell align="right">
+                    {product.has_price_options ? (
+                      <span>From {Math.min(...product.price_options.map(opt => opt.price)).toFixed(2)}</span>
+                    ) : (
+                      product.price.toFixed(2)
+                    )}
+                  </TableCell>
                   <TableCell align="right">{product.stock_quantity}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded text-xs ${
@@ -281,6 +423,13 @@ const ProductManagement = () => {
                     }`}>
                       {product.status}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {product.is_seasonal ? (
+                      <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">Seasonal</span>
+                    ) : (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Regular</span>
+                    )}
                   </TableCell>
                   <TableCell align="center">
                     <IconButton 
@@ -363,7 +512,7 @@ const ProductManagement = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 name="price"
-                label="Price (₹)"
+                label="Base Price (₹)"
                 fullWidth
                 type="number"
                 value={formData.price}
@@ -423,6 +572,129 @@ const ProductManagement = () => {
                 )}
               </FormControl>
             </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formData.is_seasonal}
+                    onChange={handleInputChange}
+                    name="is_seasonal"
+                  />
+                }
+                label="Seasonal Product"
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formData.has_price_options}
+                    onChange={handleInputChange}
+                    name="has_price_options"
+                  />
+                }
+                label="Has Multiple Price Options"
+              />
+            </Grid>
+            
+            {formData.has_price_options && (
+              <Grid item xs={12}>
+                <Box className="mb-3">
+                  <Box className="flex justify-between items-center">
+                    <Typography variant="subtitle1">Price Options</Typography>
+                    <Button 
+                      startIcon={<AddIcon />}
+                      onClick={addPriceOption}
+                      size="small"
+                    >
+                      Add Option
+                    </Button>
+                  </Box>
+                  
+                  {formErrors.price_options && (
+                    <FormHelperText error>{formErrors.price_options}</FormHelperText>
+                  )}
+                  
+                  {formData.price_options.length === 0 ? (
+                    <Box className="p-4 mt-2 bg-gray-100 text-center rounded">
+                      <Typography variant="body2" color="textSecondary">
+                        No price options defined. Click "Add Option" to add one.
+                      </Typography>
+                    </Box>
+                  ) : (
+                    formData.price_options.map((option, index) => (
+                      <Accordion key={index} className="mt-2">
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                          <Typography>
+                            Option {index + 1}: {option.type} - {option.size} - {option.quantity} - ₹{option.price}
+                          </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <FormControl fullWidth>
+                                <InputLabel>Type</InputLabel>
+                                <Select
+                                  value={option.type}
+                                  onChange={(e) => handlePriceOptionChange(index, 'type', e.target.value)}
+                                  label="Type"
+                                >
+                                  <MenuItem value="box">Box</MenuItem>
+                                  <MenuItem value="quantity">Quantity</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <FormControl fullWidth>
+                                <InputLabel>Size</InputLabel>
+                                <Select
+                                  value={option.size}
+                                  onChange={(e) => handlePriceOptionChange(index, 'size', e.target.value)}
+                                  label="Size"
+                                >
+                                  <MenuItem value="small">Small</MenuItem>
+                                  <MenuItem value="medium">Medium</MenuItem>
+                                  <MenuItem value="big">Big</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="Quantity (e.g. '1 Dz' or '6.5/7 Dz')"
+                                fullWidth
+                                value={option.quantity}
+                                onChange={(e) => handlePriceOptionChange(index, 'quantity', e.target.value)}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="Price (₹)"
+                                fullWidth
+                                type="number"
+                                value={option.price}
+                                onChange={(e) => handlePriceOptionChange(index, 'price', e.target.value)}
+                                inputProps={{ min: 0, step: 0.01 }}
+                              />
+                            </Grid>
+                            <Grid item xs={12} className="flex justify-end">
+                              <Button 
+                                variant="outlined" 
+                                color="error"
+                                onClick={() => removePriceOption(index)}
+                              >
+                                Remove Option
+                              </Button>
+                            </Grid>
+                          </Grid>
+                        </AccordionDetails>
+                      </Accordion>
+                    ))
+                  )}
+                </Box>
+              </Grid>
+            )}
             
             {formData.image_url && (
               <Grid item xs={12}>

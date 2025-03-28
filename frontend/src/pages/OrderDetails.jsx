@@ -159,7 +159,18 @@ const OrderDetails = () => {
                   className="object-cover"
                 />
                 <CardContent className="flex-grow">
-                  <Typography variant="h6">{item.product.name}</Typography>
+                  <Box>
+                    <Typography variant="h6">{item.product.name}</Typography>
+                    {item.selected_option && (
+                      <Chip
+                        label={`${item.selected_option.size} - ${item.selected_option.type} - ${item.selected_option.quantity}`}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        className="mb-2 mt-1"
+                      />
+                    )}
+                  </Box>
                   <Typography variant="body2" color="text.secondary" paragraph className="line-clamp-2">
                     {item.product.description}
                   </Typography>

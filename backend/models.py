@@ -1,8 +1,15 @@
 from pydantic import BaseModel, Field, EmailStr, validator
 import re
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
+
+
+class PriceOption(BaseModel):
+    type: str  # "box" or "quantity"
+    size: str  # "small", "medium", "big"
+    quantity: str  # e.g., "6.5/7 Dz", "1 Dz"
+    price: float
 
 
 class UserBase(BaseModel):
@@ -64,6 +71,9 @@ class ProductBase(BaseModel):
     category: str
     stock_quantity: int
     status: str
+    is_seasonal: bool = False
+    price_options: Optional[List[Dict[str, Any]]] = None
+    has_price_options: bool = False
 
 
 class ProductCreate(ProductBase):
@@ -78,21 +88,27 @@ class ProductUpdate(BaseModel):
     category: Optional[str] = None
     stock_quantity: Optional[int] = None
     status: Optional[str] = None
+    is_seasonal: Optional[bool] = None
+    price_options: Optional[List[Dict[str, Any]]] = None
+    has_price_options: Optional[bool] = None
 
 
 class ProductResponse(ProductBase):
     id: str
 
 
+# Use Dict for the selected_option instead of a nested model to avoid serialization issues
 class CartItem(BaseModel):
     product_id: str
     quantity: int
+    selected_option: Optional[Dict[str, Any]] = None
 
 
 class CartItemResponse(BaseModel):
     product_id: str
     product: ProductResponse
     quantity: int
+    selected_option: Optional[Dict[str, Any]] = None
 
 
 class CartResponse(BaseModel):
@@ -119,6 +135,7 @@ class OrderItemBase(BaseModel):
     product_id: str
     quantity: int
     price_at_purchase: float
+    selected_option: Optional[Dict[str, Any]] = None
 
 
 class OrderCreate(BaseModel):
@@ -148,6 +165,7 @@ class OrderItem(BaseModel):
     product_id: str
     quantity: int
     price_at_purchase: float
+    selected_option: Optional[Dict[str, Any]] = None
 
 
 class OrderUpdate(BaseModel):

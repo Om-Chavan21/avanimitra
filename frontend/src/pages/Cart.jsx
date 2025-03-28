@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Container, Typography, Box, Paper, Grid, Button, Divider,
   Card, CardContent, CardMedia, IconButton, TextField, CircularProgress,
-  Alert
+  Alert, Chip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -26,9 +26,19 @@ const Cart = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const handleQuantityChange = (productId, quantity) => {
+  const handleQuantityChange = (productId, quantity, selectedOption = null) => {
     if (quantity < 1) return;
-    updateCartItem(productId, quantity);
+    
+    const updatedItem = {
+      product_id: productId,
+      quantity
+    };
+    
+    if (selectedOption) {
+      updatedItem.selected_option = selectedOption;
+    }
+    
+    updateCartItem(productId, updatedItem);
   };
 
   const handleRemoveItem = (productId) => {
@@ -120,7 +130,18 @@ const Cart = () => {
                     />
                     <CardContent className="flex-grow">
                       <Box className="flex justify-between">
-                        <Typography variant="h6">{item.product.name}</Typography>
+                        <Box>
+                          <Typography variant="h6">{item.product.name}</Typography>
+                          {item.selected_option && (
+                            <Chip 
+                              label={`${item.selected_option.size} - ${item.selected_option.type} - ${item.selected_option.quantity}`}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                              className="mt-1"
+                            />
+                          )}
+                        </Box>
                         <IconButton 
                           color="error"
                           onClick={() => handleRemoveItem(item.product_id)}
@@ -132,12 +153,18 @@ const Cart = () => {
                         {item.product.description}
                       </Typography>
                       <Typography variant="body1" color="primary">
-                        ₹{item.product.price.toFixed(2)}
+                        {item.selected_option ? 
+                          `₹${item.selected_option.price.toFixed(2)}` : 
+                          `₹${item.product.price.toFixed(2)}`}
                       </Typography>
                       <Box className="flex items-center mt-2">
                         <IconButton 
                           color="primary" 
-                          onClick={() => handleQuantityChange(item.product_id, item.quantity - 1)}
+                          onClick={() => handleQuantityChange(
+                            item.product_id, 
+                            item.quantity - 1, 
+                            item.selected_option
+                          )}
                           disabled={item.quantity <= 1}
                         >
                           <RemoveIcon />
@@ -153,7 +180,11 @@ const Cart = () => {
                         />
                         <IconButton 
                           color="primary"
-                          onClick={() => handleQuantityChange(item.product_id, item.quantity + 1)}
+                          onClick={() => handleQuantityChange(
+                            item.product_id, 
+                            item.quantity + 1, 
+                            item.selected_option
+                          )}
                         >
                           <AddIcon />
                         </IconButton>

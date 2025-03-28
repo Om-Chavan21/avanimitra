@@ -5,7 +5,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, FormControl, InputLabel, Select, MenuItem, 
   Chip, Tab, Tabs, Divider, Card, CardContent, CardMedia, Alert,
-  TextField, IconButton, Tooltip, Autocomplete
+  TextField, IconButton, Tooltip, Autocomplete, RadioGroup, 
+  Radio, FormControlLabel, FormLabel
 } from '@mui/material';
 import { Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -45,6 +46,10 @@ const OrderManagement = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productQuantity, setProductQuantity] = useState(1);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [customItemRate, setCustomItemRate] = useState(0);
+  const [useCustomItemRate, setUseCustomItemRate] = useState(false);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [optionType, setOptionType] = useState('box');
   
   // Tab state
   const [tabValue, setTabValue] = useState(0);
@@ -89,6 +94,30 @@ const OrderManagement = () => {
     fetchProducts();
   }, [searchParams]);
   
+  // When a product is selected, initialize the price options if available
+  useEffect(() => {
+    if (selectedProduct?.has_price_options && selectedProduct.price_options?.length > 0) {
+      // Group options by type (box or quantity)
+      const boxOptions = selectedProduct.price_options.filter(opt => opt.type === 'box');
+      const quantityOptions = selectedProduct.price_options.filter(opt => opt.type === 'quantity');
+      
+      // Set default option based on current selection type
+      const defaultOptions = optionType === 'box' ? boxOptions : quantityOptions;
+      if (defaultOptions.length > 0) {
+        setSelectedOption(defaultOptions[0]);
+        setCustomItemRate(defaultOptions[0].price);
+      } else if (selectedProduct.price_options.length > 0) {
+        // If no options for the selected type, use the first available
+        setOptionType(selectedProduct.price_options[0].type);
+        setSelectedOption(selectedProduct.price_options[0]);
+        setCustomItemRate(selectedProduct.price_options[0].price);
+      }
+    } else if (selectedProduct) {
+      setSelectedOption(null);
+      setCustomItemRate(selectedProduct.price);
+    }
+  }, [selectedProduct, optionType]);
+  
   const fetchOrders = async (specificOrderId = null) => {
     try {
       setLoading(true);
@@ -121,7 +150,10 @@ const OrderManagement = () => {
   
   const fetchProducts = async () => {
     try {
-      const response = await api.get('/products');
+      const token = localStorage.getItem('token');
+      const response = await api.get('/admin/products', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setProducts(response.data);
     } catch (err) {
       console.error('Error fetching products:', err);
@@ -219,11 +251,20 @@ const OrderManagement = () => {
       const token = localStorage.getItem('token');
       
       // Format items for the API
-      const formattedItems = editedOrder.items.map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price_at_purchase: item.price_at_purchase
-      }));
+      const formattedItems = editedOrder.items.map(item => {
+        const formattedItem = {
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price_at_purchase: item.price_at_purchase
+        };
+        
+        // Include selected option if present
+        if (item.selected_option) {
+          formattedItem.selected_option = item.selected_option;
+        }
+        
+        return formattedItem;
+      });
       
       await api.put(
         `/admin/orders/${editedOrder.id}`,
@@ -317,6 +358,10 @@ const OrderManagement = () => {
   const handleOpenProductDialog = () => {
     setSelectedProduct(null);
     setProductQuantity(1);
+    setCustomItemRate(0);
+    setUseCustomItemRate(false);
+    setSelectedOption(null);
+    setOptionType('box');
     setProductDialogOpen(true);
   };
   
@@ -326,15 +371,50 @@ const OrderManagement = () => {
     setProductQuantity(1);
   };
   
+  const handleOptionTypeChange = (e) => {
+    setOptionType(e.target.value);
+  };
+  
+  const handleOptionChange = (e) => {
+    if (!selectedProduct?.has_price_options) return;
+    
+    const optionId = e.target.value;
+    const option = selectedProduct.price_options.find(opt => 
+      opt.type === optionType && opt.size === optionId
+    );
+    
+    if (option) {
+      setSelectedOption(option);
+      setCustomItemRate(option.price);
+    }
+  };
+  
   const handleAddProduct = () => {
     if (!selectedProduct || productQuantity < 1) return;
     
+    // Determine price to use and selected option
+    let price = selectedProduct.price;
+    let option = null;
+    
+    if (useCustomItemRate) {
+      price = customItemRate;
+    } else if (selectedOption) {
+      price = selectedOption.price;
+      option = selectedOption;
+    }
+    
+    // Create item
     const newItem = {
       product_id: selectedProduct.id,
       quantity: productQuantity,
-      price_at_purchase: selectedProduct.price,
+      price_at_purchase: price,
       product: selectedProduct
     };
+    
+    // Add selected option if applicable
+    if (option && !useCustomItemRate) {
+      newItem.selected_option = option;
+    }
     
     // Add the product to the order
     const updatedItems = [...editedOrder.items, newItem];
@@ -611,6 +691,15 @@ const OrderManagement = () => {
                           <Typography variant="subtitle1">
                             {item.product.name}
                           </Typography>
+                          {item.selected_option && (
+                            <Chip
+                              size="small"
+                              label={`${item.selected_option.size} - ${item.selected_option.type} - ${item.selected_option.quantity}`}
+                              variant="outlined"
+                              color="primary"
+                              sx={{ mt: 0.5 }}
+                            />
+                          )}
                           <Box className="flex justify-between mt-2">
                             <Typography variant="body2">
                               Quantity: {item.quantity}
@@ -705,7 +794,7 @@ const OrderManagement = () => {
                 Close
               </Button>
               <Button 
-                variant="contained" 
+                variant=" contained" 
                 color="primary"
                 onClick={() => {
                   handleCloseViewDialog();
@@ -873,9 +962,20 @@ const OrderManagement = () => {
                                     alt={item.product.name}
                                     className="w-12 h-12 object-cover mr-2"
                                   />
-                                  <Typography variant="body2">
-                                    {item.product.name}
-                                  </Typography>
+                                  <Box>
+                                    <Typography variant="body2">
+                                      {item.product.name}
+                                    </Typography>
+                                    {item.selected_option && (
+                                      <Chip
+                                        size="small"
+                                        label={`${item.selected_option.size} - ${item.selected_option.type} - ${item.selected_option.quantity}`}
+                                        variant="outlined"
+                                        color="primary"
+                                        sx={{ mt: 0.5 }}
+                                      />
+                                    )}
+                                  </Box>
                                 </Box>
                               </TableCell>
                               <TableCell>
@@ -999,14 +1099,14 @@ const OrderManagement = () => {
       </Dialog>
       
       {/* Add Product Dialog */}
-      <Dialog open={productDialogOpen} onClose={handleCloseProductDialog}>
+      <Dialog open={productDialogOpen} onClose={handleCloseProductDialog} maxWidth="md" fullWidth>
         <DialogTitle>
           Add Product to Order
         </DialogTitle>
         <DialogContent>
           <Box className="pt-2 space-y-4">
             <Autocomplete
-              options={products}
+              options={products.filter(p => p.status === 'active')}
               getOptionLabel={(product) => product.name}
               onChange={(_, newValue) => {
                 setSelectedProduct(newValue);
@@ -1029,20 +1129,70 @@ const OrderManagement = () => {
                   <Box>
                     <Typography variant="body1">{option.name}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      ₹{option.price.toFixed(2)}
+                      {option.has_price_options ? 
+                        `From ₹${Math.min(...option.price_options.map(opt => opt.price)).toFixed(2)}` : 
+                        `₹${option.price.toFixed(2)}`}
                     </Typography>
                   </Box>
                 </Box>
               )}
             />
             
+            {selectedProduct?.has_price_options && (
+              <Box className="mt-4 p-3 border rounded">
+                <FormControl component="fieldset" fullWidth>
+                  <FormLabel component="legend">Select Option Type</FormLabel>
+                  <RadioGroup 
+                    row
+                    name="option-type" 
+                    value={optionType} 
+                    onChange={handleOptionTypeChange}
+                  >
+                    <FormControlLabel value="box" control={<Radio />} label="Box" />
+                    <FormControlLabel value="quantity" control={<Radio />} label="By Dozen" />
+                  </RadioGroup>
+                </FormControl>
+
+                <FormControl fullWidth margin="normal">
+                  <InputLabel>Select Size</InputLabel>
+                  <Select
+                    value={selectedOption?.size || ''}
+                    onChange={handleOptionChange}
+                    label="Select Size"
+                  >
+                    {selectedProduct.price_options
+                      .filter(opt => opt.type === optionType)
+                      .map((opt, idx) => (
+                        <MenuItem key={idx} value={opt.size}>
+                          {opt.size} - {opt.quantity} - ₹{opt.price.toFixed(2)}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+
+                {selectedOption && (
+                  <Box className="mt-3">
+                    <Typography variant="subtitle2" gutterBottom>
+                      Selected Option Details:
+                    </Typography>
+                    <Grid container spacing={1}>
+                      <Grid item xs={4}>
+                        <Typography variant="body2">Size: {selectedOption.size}</Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="body2">Quantity: {selectedOption.quantity}</Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="body2">Price: ₹{selectedOption.price.toFixed(2)}</Typography>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                )}
+              </Box>
+            )}
+            
             {selectedProduct && (
               <>
-                <Box className="flex items-center justify-between">
-                  <Typography>Price:</Typography>
-                  <Typography>₹{selectedProduct.price.toFixed(2)}</Typography>
-                </Box>
-                
                 <Box className="flex items-center justify-between">
                   <Typography>Quantity:</Typography>
                   <Box className="flex items-center">
@@ -1078,10 +1228,46 @@ const OrderManagement = () => {
                   </Box>
                 </Box>
                 
+                <Box className="mt-4">
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={useCustomItemRate}
+                        onChange={(e) => setUseCustomItemRate(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Use Custom Price"
+                  />
+                  
+                  {useCustomItemRate && (
+                    <TextField
+                      label="Custom Price (₹)"
+                      type="number"
+                      value={customItemRate}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value);
+                        if (!isNaN(value) && value >= 0) {
+                          setCustomItemRate(value);
+                        }
+                      }}
+                      fullWidth
+                      margin="normal"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">₹</InputAdornment>
+                        ),
+                      }}
+                    />
+                  )}
+                </Box>
+                
                 <Box className="flex items-center justify-between">
                   <Typography variant="subtitle1">Total:</Typography>
                   <Typography variant="subtitle1" color="primary">
-                    ₹{(selectedProduct.price * productQuantity).toFixed(2)}
+                    ₹{(useCustomItemRate ? customItemRate * productQuantity : 
+                        (selectedOption ? selectedOption.price * productQuantity : 
+                          selectedProduct.price * productQuantity)).toFixed(2)}
                   </Typography>
                 </Box>
               </>
@@ -1096,7 +1282,7 @@ const OrderManagement = () => {
             onClick={handleAddProduct} 
             variant="contained" 
             color="primary"
-            disabled={!selectedProduct}
+            disabled={!selectedProduct || (selectedProduct.has_price_options && !selectedOption && !useCustomItemRate)}
           >
             Add Product
           </Button>
@@ -1107,4 +1293,3 @@ const OrderManagement = () => {
 };
 
 export default OrderManagement;
-

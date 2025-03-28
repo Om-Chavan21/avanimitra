@@ -92,15 +92,27 @@ async def create_order(
 
         product = serialize_doc_id(product)
 
+        # Determine price based on selected option
+        item_price = product["price"]
+        selected_option = None
+        
+        if item.selected_option:
+            # No need to call .dict() since it's already a dict
+            selected_option = item.selected_option
+            item_price = selected_option["price"]
+
         # Add item to order
         order_item = {
             "product_id": item.product_id,
             "quantity": item.quantity,
-            "price_at_purchase": product["price"],
+            "price_at_purchase": item_price,
         }
+        
+        if selected_option:
+            order_item["selected_option"] = selected_option
 
         items.append(order_item)
-        total_amount += product["price"] * item.quantity
+        total_amount += item_price * item.quantity
 
     order["items"] = items
     order["total_amount"] = total_amount
@@ -172,7 +184,7 @@ async def repeat_order(
         "order_date": datetime.utcnow(),
         "delivery_address": original_order["delivery_address"],
         "receiver_phone": original_order["receiver_phone"],
-        "items": original_order["items"],
+        "items": original_order["items"],  # This will include selected_option if present
         "total_amount": original_order["total_amount"],
         "order_status": OrderStatus.PENDING,
         "payment_status": PaymentStatus.PENDING,
@@ -287,6 +299,10 @@ async def update_order(
                 "quantity": item.quantity,
                 "price_at_purchase": item.price_at_purchase,
             }
+            
+            # Include selected option if provided
+            if item.selected_option:
+                order_item["selected_option"] = item.selected_option
 
             items_data.append(order_item)
             total_amount += item.price_at_purchase * item.quantity
@@ -347,8 +363,8 @@ async def create_custom_order(
         )
 
     # Apply discount if specified
-    items = order_data.items
-    base_total = sum(item.price_at_purchase * item.quantity for item in items)
+    items = [item.dict() for item in order_data.items]
+    base_total = sum(item["price_at_purchase"] * item["quantity"] for item in items)
     total_amount = base_total
     
     # Handle discounts
@@ -369,7 +385,7 @@ async def create_custom_order(
         "order_date": datetime.utcnow(),
         "delivery_address": order_data.delivery_address,
         "receiver_phone": order_data.receiver_phone,
-        "items": [item.dict() for item in order_data.items],
+        "items": items,
         "total_amount": total_amount,
         "order_status": order_data.order_status,
         "payment_status": order_data.payment_status,
@@ -482,7 +498,13 @@ async def process_export_orders(
                 else:
                     product_name = f"Unknown Product ({item['product_id']})"
                 
-                item_text = f"{product_name} x {item['quantity']} @ ₹{item['price_at_purchase']}"
+                # Get option details if present
+                option_details = ""
+                if "selected_option" in item:
+                    option = item["selected_option"]
+                    option_details = f" ({option['type']} - {option['size']} - {option['quantity']})"
+                
+                item_text = f"{product_name}{option_details} x {item['quantity']} @ ₹{item['price_at_purchase']}"
                 items_text.append(item_text)
                 
                 # Add individual item details if all fields are included
@@ -492,6 +514,12 @@ async def process_export_orders(
                     order_row[f"Item {idx+1} Quantity"] = item["quantity"]
                     order_row[f"Item {idx+1} Price"] = item["price_at_purchase"]
                     order_row[f"Item {idx+1} Subtotal"] = item["price_at_purchase"] * item["quantity"]
+                    
+                    if "selected_option" in item:
+                        option = item["selected_option"]
+                        order_row[f"Item {idx+1} Option Type"] = option.get("type", "")
+                        order_row[f"Item {idx+1} Option Size"] = option.get("size", "")
+                        order_row[f"Item {idx+1} Option Quantity"] = option.get("quantity", "")
             
             # Join all items
             order_row["Items"] = ", ".join(items_text)
@@ -614,13 +642,18 @@ async def format_order_response(order):
         )
         if product:
             product = serialize_doc_id(product)
-            item_with_product = OrderItemResponse(
-                product_id=item["product_id"],
-                quantity=item["quantity"],
-                price_at_purchase=item["price_at_purchase"],
-                product=ProductResponse(**product),
-            )
-            items_with_products.append(item_with_product)
+            item_response = {
+                "product_id": item["product_id"],
+                "quantity": item["quantity"],
+                "price_at_purchase": item["price_at_purchase"],
+                "product": ProductResponse(**product),
+            }
+            
+            # Include selected option if present
+            if "selected_option" in item:
+                item_response["selected_option"] = item["selected_option"]
+                
+            items_with_products.append(OrderItemResponse(**item_response))
 
     # Create order response
     order_response = OrderResponse(

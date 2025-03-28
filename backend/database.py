@@ -7,8 +7,9 @@ from datetime import datetime
 load_dotenv()
 
 MONGODB_URI = environ.get("MONGODB_URI")
+DATABASE_NAME = environ.get("DATABASE_NAME")
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URI)
-database = client.ecommerce
+database = client[DATABASE_NAME]
 
 users_collection = database.users
 products_collection = database.products
@@ -45,23 +46,34 @@ async def get_user_cart(user_id):
     return serialize_doc_id(cart)
 
 
-async def add_to_cart(user_id, product_id, quantity=1):
+async def add_to_cart(user_id, item_data):
     cart = await get_user_cart(user_id)
-
+    product_id = item_data["product_id"]
+    
     # Check if item already exists in cart
     found = False
     if "items" in cart:
-        for item in cart["items"]:
+        for idx, item in enumerate(cart["items"]):
             if item["product_id"] == product_id:
-                item["quantity"] += quantity
-                found = True
-                break
+                # Check if the selected_option is the same
+                same_option = True
+                if "selected_option" in item_data:
+                    if "selected_option" not in item or item["selected_option"] != item_data["selected_option"]:
+                        same_option = False
+                elif "selected_option" in item:
+                    same_option = False
+                
+                if same_option:
+                    # Update quantity if same product and option
+                    cart["items"][idx]["quantity"] += item_data["quantity"]
+                    found = True
+                    break
 
     # Add new item if not found
     if not found:
         if "items" not in cart:
             cart["items"] = []
-        cart["items"].append({"product_id": product_id, "quantity": quantity})
+        cart["items"].append(item_data)
 
     # Update cart in database
     await carts_collection.update_one(
@@ -71,21 +83,40 @@ async def add_to_cart(user_id, product_id, quantity=1):
     return cart
 
 
-async def update_cart_item(user_id, product_id, quantity):
+async def update_cart_item(user_id, product_id, update_data):
+    quantity = update_data.get("quantity", 0)
+    
+    # Find the cart and item
+    cart = await get_user_cart(user_id)
+    items = cart.get("items", [])
+    
     if quantity <= 0:
         # Remove item if quantity is 0 or negative
         await carts_collection.update_one(
             {"user_id": user_id}, {"$pull": {"items": {"product_id": product_id}}}
         )
     else:
-        # Update quantity
-        await carts_collection.update_one(
-            {"user_id": user_id, "items.product_id": product_id},
-            {"$set": {"items.$.quantity": quantity}},
-        )
+        # Check if we're updating an option
+        if "selected_option" in update_data:
+            for idx, item in enumerate(items):
+                if item["product_id"] == product_id:
+                    # Update both quantity and selected_option
+                    items[idx]["quantity"] = quantity
+                    items[idx]["selected_option"] = update_data["selected_option"]
+                    break
+            
+            # Update the entire items array
+            await carts_collection.update_one(
+                {"user_id": user_id}, {"$set": {"items": items}}
+            )
+        else:
+            # Just update quantity
+            await carts_collection.update_one(
+                {"user_id": user_id, "items.product_id": product_id},
+                {"$set": {"items.$.quantity": quantity}}
+            )
 
     return await get_user_cart(user_id)
-
 
 async def clear_cart(user_id):
     await carts_collection.update_one({"user_id": user_id}, {"$set": {"items": []}})

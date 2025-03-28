@@ -10,9 +10,9 @@ router = APIRouter()
 
 @router.get("/products", response_model=List[ProductResponse])
 async def get_all_products(
-    category: Optional[str] = None, status: Optional[str] = None
+    category: Optional[str] = None, status: Optional[str] = None, seasonal: Optional[bool] = None
 ):
-    # Filter products by category and status if provided
+    # Filter products by category, status and seasonal flag if provided
     filter_query = {}
     if category:
         filter_query["category"] = category
@@ -21,6 +21,10 @@ async def get_all_products(
     else:
         # By default, only show active products
         filter_query["status"] = "active"
+        
+    # Filter by seasonal flag if provided
+    if seasonal is not None:
+        filter_query["is_seasonal"] = seasonal
 
     products = await products_collection.find(filter_query).to_list(1000)
     return serialize_list(products)
@@ -113,8 +117,114 @@ async def delete_product(
     return {"message": "Product deleted successfully"}
 
 
+# Update the products to new format (migration helper)
+@router.post("/admin/update-mango-products", include_in_schema=False)
+async def update_mango_products(current_user: UserInDB = Depends(get_current_user)):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+    
+    # Find mango products
+    mango_products = await products_collection.find({
+        "category": "mangoes"
+    }).to_list(100)
+    
+    updated_count = 0
+    
+    for product in mango_products:
+        product_id = product["_id"]
+        name = product["name"]
+        
+        # Extract size from name
+        size = None
+        if "Small" in name:
+            size = "small"
+        elif "Medium" in name:
+            size = "medium"
+        elif "Big" in name:
+            size = "big"
+        
+        # Skip if size not found
+        if not size:
+            continue
+            
+        # Create price options based on size
+        price_options = []
+        
+        # Box option
+        if size == "small":
+            price_options.append({
+                "type": "box",
+                "size": size,
+                "quantity": "6.5/7 Dz",
+                "price": 5300
+            })
+            # Dozen option
+            price_options.append({
+                "type": "quantity",
+                "size": size,
+                "quantity": "1 Dz",
+                "price": 850
+            })
+        elif size == "medium":
+            price_options.append({
+                "type": "box",
+                "size": size,
+                "quantity": "5.5/6 Dz",
+                "price": 6300
+            })
+            # Dozen option
+            price_options.append({
+                "type": "quantity",
+                "size": size,
+                "quantity": "1 Dz",
+                "price": 1200
+            })
+        elif size == "big":
+            price_options.append({
+                "type": "box",
+                "size": size,
+                "quantity": "5/5.25 Dz",
+                "price": 7400
+            })
+            # Dozen option
+            price_options.append({
+                "type": "quantity",
+                "size": size,
+                "quantity": "1 Dz",
+                "price": 1550
+            })
+        
+        # Update product with new fields
+        simplified_name = f"Devgad Hapus Mangoes ({size})"
+        
+        await products_collection.update_one(
+            {"_id": product_id},
+            {
+                "$set": {
+                    "name": simplified_name,
+                    "is_seasonal": True,
+                    "has_price_options": True,
+                    "price_options": price_options
+                }
+            }
+        )
+        
+        updated_count += 1
+    
+    # Set all other products as not seasonal
+    await products_collection.update_many(
+        {"category": {"$ne": "mangoes"}},
+        {"$set": {"is_seasonal": False}}
+    )
+    
+    return {"message": f"Updated {updated_count} mango products"}
+
+
 # Seed some products (for testing)
-@router.post("/seed-products", include_in_schema=False)
+@router.post("/seed-products", include_in_schema=True)
 async def seed_products():
     # Check if products already exist
     count = await products_collection.count_documents({})
@@ -129,6 +239,7 @@ async def seed_products():
             "category": "apples",
             "stock_quantity": 100,
             "status": "active",
+            "is_seasonal": False
         },
         {
             "name": "Organic Bananas",
@@ -138,6 +249,7 @@ async def seed_products():
             "category": "bananas",
             "stock_quantity": 150,
             "status": "active",
+            "is_seasonal": False
         },
         {
             "name": "Organic Oranges",
@@ -147,25 +259,188 @@ async def seed_products():
             "category": "citrus",
             "stock_quantity": 80,
             "status": "active",
+            "is_seasonal": False
         },
         {
-            "name": "Organic Mangoes",
-            "description": "Sweet and flavorful organic mangoes",
-            "price": 200.0,  # ₹200 per kg
-            "image_url": "https://images.unsplash.com/photo-1605027990121-cbae9e0642df",
+            "name": "Devgad Hapus Mangoes (small)",
+            "description": "Original Devgad Hapus Mangoes. \nOrganically ripened.\nExpected date of Arrival - 04/04/2025",
+            "price": 5300.0,  # Default price for box
+            "image_url": "https://nutrigainorganics.com/wp-content/uploads/2024/04/4.png",
             "category": "mangoes",
             "stock_quantity": 50,
             "status": "active",
+            "is_seasonal": True,
+            "has_price_options": True,
+            "price_options": [
+                {
+                    "type": "box",
+                    "size": "small",
+                    "quantity": "6.5/7 Dz",
+                    "price": 5300
+                },
+                {
+                    "type": "quantity",
+                    "size": "small",
+                    "quantity": "1 Dz",
+                    "price": 850
+                }
+            ]
         },
         {
-            "name": "Organic Strawberries",
-            "description": "Juicy and fragrant organic strawberries",
-            "price": 250.0,  # ₹250 per box
-            "image_url": "https://images.unsplash.com/photo-1518635017498-87f514b751ba",
-            "category": "berries",
-            "stock_quantity": 30,
+            "name": "Devgad Hapus Mangoes (medium)",
+            "description": "Original Devgad Hapus Mangoes. \nOrganically ripened.\nExpected date of Arrival - 04/04/2025",
+            "price": 6300.0,  # Default price for box
+            "image_url": "https://nutrigainorganics.com/wp-content/uploads/2024/04/4.png",
+            "category": "mangoes",
+            "stock_quantity": 50,
             "status": "active",
+            "is_seasonal": True,
+            "has_price_options": True,
+            "price_options": [
+                {
+                    "type": "box",
+                    "size": "medium",
+                    "quantity": "5.5/6 Dz",
+                    "price": 6300
+                },
+                {
+                    "type": "quantity",
+                    "size": "medium",
+                    "quantity": "1 Dz",
+                    "price": 1200
+                }
+            ]
+        },
+        {
+            "name": "Devgad Hapus Mangoes (big)",
+            "description": "Original Devgad Hapus Mangoes. \nOrganically ripened.\nExpected date of Arrival - 04/04/2025",
+            "price": 7400.0,  # Default price for box
+            "image_url": "https://nutrigainorganics.com/wp-content/uploads/2024/04/4.png",
+            "category": "mangoes",
+            "stock_quantity": 50,
+            "status": "active",
+            "is_seasonal": True,
+            "has_price_options": True,
+            "price_options": [
+                {
+                    "type": "box",
+                    "size": "big",
+                    "quantity": "5/5.25 Dz",
+                    "price": 7400
+                },
+                {
+                    "type": "quantity",
+                    "size": "big",
+                    "quantity": "1 Dz",
+                    "price": 1550
+                }
+            ]
         },
     ]
     result = await products_collection.insert_many(products)
     return {"message": f"{len(result.inserted_ids)} products created successfully"}
+
+# Update the products to new format (migration helper)
+@router.post("/admin/update-mango-products", include_in_schema=True)
+async def update_mango_products(current_user: UserInDB = Depends(get_current_user)):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+    
+    # Find mango products
+    mango_products = await products_collection.find({
+        "category": "mangoes"
+    }).to_list(100)
+    
+    updated_count = 0
+    
+    for product in mango_products:
+        product_id = product["_id"]
+        name = product["name"]
+        
+        # Extract size from name
+        size = None
+        if "Small" in name:
+            size = "small"
+        elif "Medium" in name:
+            size = "medium"
+        elif "Big" in name:
+            size = "big"
+        
+        # Skip if size not found
+        if not size:
+            continue
+            
+        # Create price options based on size
+        price_options = []
+        
+        # Box option
+        if size == "small":
+            price_options.append({
+                "type": "box",
+                "size": size,
+                "quantity": "6.5/7 Dz",
+                "price": 5300
+            })
+            # Dozen option
+            price_options.append({
+                "type": "quantity",
+                "size": size,
+                "quantity": "1 Dz",
+                "price": 850
+            })
+        elif size == "medium":
+            price_options.append({
+                "type": "box",
+                "size": size,
+                "quantity": "5.5/6 Dz",
+                "price": 6300
+            })
+            # Dozen option
+            price_options.append({
+                "type": "quantity",
+                "size": size,
+                "quantity": "1 Dz",
+                "price": 1200
+            })
+        elif size == "big":
+            price_options.append({
+                "type": "box",
+                "size": size,
+                "quantity": "5/5.25 Dz",
+                "price": 7400
+            })
+            # Dozen option
+            price_options.append({
+                "type": "quantity",
+                "size": size,
+                "quantity": "1 Dz",
+                "price": 1550
+            })
+        
+        # Update product with new fields
+        simplified_name = f"Devgad Hapus Mangoes ({size})"
+        
+        await products_collection.update_one(
+            {"_id": product_id},
+            {
+                "$set": {
+                    "name": simplified_name,
+                    "is_seasonal": True,
+                    "has_price_options": True,
+                    "price_options": price_options
+                }
+            }
+        )
+        
+        updated_count += 1
+    
+    # Set all other products as not seasonal
+    await products_collection.update_many(
+        {"category": {"$ne": "mangoes"}},
+        {"$set": {"is_seasonal": False}}
+    )
+    
+    return {"message": f"Updated {updated_count} mango products"}

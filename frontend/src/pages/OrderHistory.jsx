@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Container, Typography, Box, Paper, Tab, Tabs, CircularProgress,
+  Container, Typography, Box, Paper, Button, Grid,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Button, Chip, Alert, Dialog, DialogTitle, DialogContent, 
-  DialogActions, TextField, InputAdornment, Grid
+  Chip, Tab, Tabs, Divider, Card, CardContent, CardMedia, Alert,
+  TextField, InputAdornment, Dialog, DialogTitle, DialogContent, 
+  DialogActions, CircularProgress
 } from '@mui/material';
-import api from '../utils/api';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
+import api from '../utils/api';
 import RepeatIcon from '@mui/icons-material/Repeat';
 
 const OrderHistory = () => {
@@ -107,10 +109,19 @@ const OrderHistory = () => {
       const orderData = {
         delivery_address: deliveryAddress,
         receiver_phone: receiverPhone,
-        items: selectedOrder.items.map(item => ({
-          product_id: item.product_id,
-          quantity: item.quantity
-        }))
+        items: selectedOrder.items.map(item => {
+          const orderItem = {
+            product_id: item.product_id,
+            quantity: item.quantity
+          };
+          
+          // Include selected option if present
+          if (item.selected_option) {
+            orderItem.selected_option = item.selected_option;
+          }
+          
+          return orderItem;
+        })
       };
       
       await api.post('/orders', orderData, {
@@ -235,9 +246,20 @@ const OrderHistory = () => {
                               alt={item.product.name}
                               className="w-10 h-10 object-cover mr-2"
                             />
-                            <Typography variant="body2">
-                              {item.product.name}
-                            </Typography>
+                            <Box>
+                              <Typography variant="body2">
+                                {item.product.name}
+                              </Typography>
+                              {item.selected_option && (
+                                <Chip
+                                  size="small"
+                                  label={`${item.selected_option.size} - ${item.selected_option.type} - ${item.selected_option.quantity}`}
+                                  variant="outlined"
+                                  color="primary"
+                                  sx={{ mt: 0.5 }}
+                                />
+                              )}
+                            </Box>
                           </Box>
                         </TableCell>
                         <TableCell align="center">{item.quantity}</TableCell>
@@ -419,7 +441,20 @@ const OrderCard = ({ order, getStatusColor, getPaymentStatusColor, formatDate, s
                   <TableBody>
                     {order.items.map((item, i) => (
                       <TableRow key={i}>
-                        <TableCell>{item.product.name}</TableCell>
+                        <TableCell>
+                          <Box>
+                            {item.product.name}
+                            {item.selected_option && (
+                              <Chip
+                                size="small"
+                                label={`${item.selected_option.size} - ${item.selected_option.type} - ${item.selected_option.quantity}`}
+                                variant="outlined"
+                                color="primary"
+                                sx={{ mt: 0.5, ml: 1 }}
+                              />
+                            )}
+                          </Box>
+                        </TableCell>
                         <TableCell align="right">{item.quantity}</TableCell>
                         <TableCell align="right">₹{(item.price_at_purchase * item.quantity).toFixed(2)}</TableCell>
                       </TableRow>

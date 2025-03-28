@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from typing import List, Dict, Any
 from bson import ObjectId
 
 from models import CartItem, CartResponse, CartItemResponse, UserInDB, ProductResponse
@@ -31,13 +31,20 @@ async def get_cart(current_user: UserInDB = Depends(get_current_user)):
             )
             if product:
                 product = serialize_doc_id(product)
+                
+                # Get price based on selected option if available
+                item_price = product["price"]
+                if "selected_option" in item and item["selected_option"]:
+                    item_price = item["selected_option"]["price"]
+                
                 cart_item = CartItemResponse(
                     product_id=item["product_id"],
                     product=ProductResponse(**product),
                     quantity=item["quantity"],
+                    selected_option=item.get("selected_option")
                 )
                 items.append(cart_item)
-                total_price += product["price"] * item["quantity"]
+                total_price += item_price * item["quantity"]
 
     return CartResponse(items=items, total_price=total_price)
 
@@ -53,8 +60,18 @@ async def add_item_to_cart(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
 
-    # Add to cart
-    await add_to_cart(current_user.id, item.product_id, item.quantity)
+    # Prepare item data with selected option
+    item_data = {
+        "product_id": item.product_id,
+        "quantity": item.quantity
+    }
+    
+    # Include selected_option if provided
+    if item.selected_option:
+        item_data["selected_option"] = item.selected_option
+
+    # Add to cart with selected options if any
+    await add_to_cart(current_user.id, item_data)
 
     # Return updated cart
     return await get_cart(current_user)
@@ -71,8 +88,17 @@ async def update_item_in_cart(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
 
+    # Prepare update data
+    update_data = {
+        "quantity": item.quantity
+    }
+    
+    # Include selected_option if provided
+    if item.selected_option:
+        update_data["selected_option"] = item.selected_option
+
     # Update cart item
-    await update_cart_item(current_user.id, product_id, item.quantity)
+    await update_cart_item(current_user.id, product_id, update_data)
 
     # Return updated cart
     return await get_cart(current_user)
@@ -83,7 +109,7 @@ async def remove_item_from_cart(
     product_id: str, current_user: UserInDB = Depends(get_current_user)
 ):
     # Update quantity to 0 to remove item
-    await update_cart_item(current_user.id, product_id, 0)
+    await update_cart_item(current_user.id, product_id, {"quantity": 0})
 
     # Return updated cart
     return await get_cart(current_user)

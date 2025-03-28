@@ -43,20 +43,18 @@ export const CartProvider = ({ children }) => {
     fetchCart();
   }, [isAuthenticated]);
 
-  const addToCart = async (productId, quantity = 1) => {
+  const addToCart = async (cartItem) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await api.post('/cart/items', 
-        { product_id: productId, quantity },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+      const response = await api.post('/cart/items', cartItem, {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
-      );
+      });
       setCart(response.data);
       return { success: true };
     } catch (error) {
+      console.error('Error adding to cart:', error);
       return { 
         success: false, 
         message: error.response?.data?.detail || 'Failed to add item to cart'
@@ -64,20 +62,18 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const updateCartItem = async (productId, quantity) => {
+  const updateCartItem = async (productId, cartItem) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await api.put(`/cart/items/${productId}`, 
-        { product_id: productId, quantity },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+      const response = await api.put(`/cart/items/${productId}`, cartItem, {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
-      );
+      });
       setCart(response.data);
       return { success: true };
     } catch (error) {
+      console.error('Error updating cart item:', error);
       return { 
         success: false, 
         message: error.response?.data?.detail || 'Failed to update item quantity'

@@ -1,11 +1,9 @@
-// frontend/src/pages/PaymentOptions.jsx
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container, Typography, Box, Paper, Grid, Button, TextField, 
   Radio, RadioGroup, FormControlLabel, FormControl, FormLabel,
-  Divider, CircularProgress, Alert, Snackbar, IconButton
+  Divider, CircularProgress, Alert, Snackbar, IconButton, Chip
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import api from '../utils/api';
@@ -83,10 +81,19 @@ const PaymentOptions = () => {
         delivery_address: orderDetails.delivery_address,
         receiver_phone: orderDetails.receiver_phone,
         payment_method: paymentMethod,
-        items: cartItems.map(item => ({
-          product_id: item.product_id,
-          quantity: item.quantity
-        }))
+        items: cartItems.map(item => {
+          const cartItem = {
+            product_id: item.product_id,
+            quantity: item.quantity
+          };
+          
+          // Include selected option if present
+          if (item.selected_option) {
+            cartItem.selected_option = item.selected_option;
+          }
+          
+          return cartItem;
+        })
       };
       
       const response = await api.post('/orders', orderData, {
@@ -345,11 +352,22 @@ const PaymentOptions = () => {
             
             {cartItems.map((item) => (
               <Box key={item.product_id} className="flex justify-between py-2">
+                <Box>
+                  <Typography variant="body2">
+                    {item.product.name} x {item.quantity}
+                  </Typography>
+                  {item.selected_option && (
+                    <Chip
+                      size="small"
+                      label={`${item.selected_option.size} - ${item.selected_option.type} - ${item.selected_option.quantity}`}
+                      variant="outlined"
+                      color="primary"
+                      sx={{ mt: 0.5 }}
+                    />
+                  )}
+                </Box>
                 <Typography variant="body2">
-                  {item.product.name} x {item.quantity}
-                </Typography>
-                <Typography variant="body2">
-                  ₹{(item.product.price * item.quantity).toFixed(2)}
+                  ₹{(item.selected_option ? item.selected_option.price * item.quantity : item.product.price * item.quantity).toFixed(2)}
                 </Typography>
               </Box>
             ))}

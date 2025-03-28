@@ -28,14 +28,14 @@ const AboutUs = () => {
       name: 'Om Chavan',
       role: 'Co-founder',
       bio: "Volunteer at Jnana Prabodhini's Youth Wing. Intern at KPIT Technologies",
-      phone: '+91 9876543211',
+      phone: '+91 8390770254',
       image: '/om_chavan.jpeg'
     },
     {
       name: 'Suresh Margale',
       role: 'Co-founder',
       bio: "Volunteer at Jnana Prabodhini's Youth Wing. Full time member of Jnana Prabodhini Harali.",
-      phone: '+91 9876543212',
+      phone: '+91 9145740750',
       image: '/profile_icon_2.png'
     }
   ];

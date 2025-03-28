@@ -5,7 +5,8 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   IconButton, CircularProgress, Autocomplete, InputAdornment,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert,
-  FormControl, InputLabel, Select, MenuItem, Divider, Switch, FormControlLabel
+  FormControl, InputLabel, Select, MenuItem, Divider, Switch, FormControlLabel,
+  RadioGroup, FormLabel, Radio, Chip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -46,6 +47,10 @@ const CustomOrder = () => {
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [customItemRate, setCustomItemRate] = useState(0);
   const [useCustomItemRate, setUseCustomItemRate] = useState(false);
+  
+  // Price option states
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [optionType, setOptionType] = useState('box');
 
   // New user dialog
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
@@ -121,6 +126,30 @@ const CustomOrder = () => {
       });
     }
   }, [selectedUser]);
+  
+  // When a product is selected, initialize the price options if available
+  useEffect(() => {
+    if (selectedProduct?.has_price_options && selectedProduct.price_options?.length > 0) {
+      // Group options by type (box or quantity)
+      const boxOptions = selectedProduct.price_options.filter(opt => opt.type === 'box');
+      const quantityOptions = selectedProduct.price_options.filter(opt => opt.type === 'quantity');
+      
+      // Set default option based on current selection type
+      const defaultOptions = optionType === 'box' ? boxOptions : quantityOptions;
+      if (defaultOptions.length > 0) {
+        setSelectedOption(defaultOptions[0]);
+        setCustomItemRate(defaultOptions[0].price);
+      } else if (selectedProduct.price_options.length > 0) {
+        // If no options for the selected type, use the first available
+        setOptionType(selectedProduct.price_options[0].type);
+        setSelectedOption(selectedProduct.price_options[0]);
+        setCustomItemRate(selectedProduct.price_options[0].price);
+      }
+    } else if (selectedProduct) {
+      setSelectedOption(null);
+      setCustomItemRate(selectedProduct.price);
+    }
+  }, [selectedProduct, optionType]);
 
   const handleUserChange = (event, newValue) => {
     setSelectedUser(newValue);
@@ -139,6 +168,8 @@ const CustomOrder = () => {
     setSelectedQuantity(1);
     setCustomItemRate(0);
     setUseCustomItemRate(false);
+    setSelectedOption(null);
+    setOptionType('box');
     setProductDialogOpen(true);
   };
 
@@ -149,7 +180,9 @@ const CustomOrder = () => {
   const handleProductSelection = (event, newValue) => {
     setSelectedProduct(newValue);
     if (newValue) {
-      setCustomItemRate(newValue.price);
+      if (!newValue.has_price_options) {
+        setCustomItemRate(newValue.price);
+      }
     }
   };
 
@@ -164,46 +197,59 @@ const CustomOrder = () => {
       setCustomItemRate(value);
     }
   };
+  
+  const handleOptionTypeChange = (e) => {
+    setOptionType(e.target.value);
+  };
+  
+  const handleOptionChange = (e) => {
+    if (!selectedProduct?.has_price_options) return;
+    
+    const optionId = e.target.value;
+    const option = selectedProduct.price_options.find(opt => 
+      opt.type === optionType && opt.size === optionId
+    );
+    
+    if (option) {
+      setSelectedOption(option);
+      setCustomItemRate(option.price);
+    }
+  };
 
   const handleAddProductToOrder = () => {
     if (!selectedProduct) return;
 
-    const price = useCustomItemRate ? customItemRate : selectedProduct.price;
-
-    // Check if product already exists in order
-    const existingItemIndex = orderItems.findIndex(
-      item => item.product_id === selectedProduct.id
-    );
-
-    if (existingItemIndex >= 0) {
-      // Update quantity if product already exists
-      const updatedItems = [...orderItems];
-      updatedItems[existingItemIndex].quantity += selectedQuantity;
-      setOrderItems(updatedItems);
-    } else {
-      // Add new product to order
-      setOrderItems([
-        ...orderItems, 
-        {
-          product_id: selectedProduct.id,
-          product: selectedProduct,
-          quantity: selectedQuantity,
-          price: price,
-          custom_price: useCustomItemRate
-        }
-      ]);
+    // Determine the price to use
+    let price = selectedProduct.price;
+    let option = null;
+    
+    if (useCustomItemRate) {
+      price = customItemRate;
+    } else if (selectedOption) {
+      price = selectedOption.price;
+      option = selectedOption;
     }
+
+    // Add new product to order
+    const newItem = {
+      product_id: selectedProduct.id,
+      product: selectedProduct,
+      quantity: selectedQuantity,
+      price: price,
+      custom_price: useCustomItemRate
+    };
+    
+    // Add selected option if applicable
+    if (option && !useCustomItemRate) {
+      newItem.selected_option = option;
+    }
+
+    setOrderItems([...orderItems, newItem]);
     handleCloseProductDialog();
   };
 
   const handleUpdateItemQuantity = (index, newQuantity) => {
     if (newQuantity < 1) return;
-    
-    const product = orderItems[index].product;
-    if (newQuantity > product.stock_quantity) {
-      setError(`Cannot add more than ${product.stock_quantity} units of ${product.name}`);
-      return;
-    }
     
     const updatedItems = [...orderItems];
     updatedItems[index].quantity = newQuantity;
@@ -274,6 +320,22 @@ const CustomOrder = () => {
             }
           : {};
       
+      // Format items to include selected_option
+      const formattedItems = orderItems.map(item => {
+        const formattedItem = {
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price_at_purchase: item.price
+        };
+        
+        // Include selected option if present
+        if (item.selected_option) {
+          formattedItem.selected_option = item.selected_option;
+        }
+        
+        return formattedItem;
+      });
+      
       await api.post(
         '/admin/custom-orders',
         {
@@ -282,11 +344,7 @@ const CustomOrder = () => {
           receiver_phone: orderDetails.receiver_phone,
           payment_status: orderDetails.payment_status,
           order_status: orderDetails.order_status,
-          items: orderItems.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            price_at_purchase: item.price
-          })),
+          items: formattedItems,
           ...discountInfo,
           total_amount: totalAmount
         },
@@ -469,6 +527,17 @@ const CustomOrder = () => {
                                 <Typography variant="caption" color="textSecondary">
                                   Stock: {item.product.stock_quantity}
                                 </Typography>
+                                
+                                {item.selected_option && (
+                                  <Chip
+                                    size="small"
+                                    label={`${item.selected_option.size} - ${item.selected_option.type} - ${item.selected_option.quantity}`}
+                                    variant="outlined"
+                                    color="primary"
+                                    sx={{ mt: 0.5 }}
+                                  />
+                                )}
+                                
                                 {item.custom_price && (
                                   <Typography variant="caption" color="primary" sx={{ display: 'block' }}>
                                     Custom Price
@@ -716,7 +785,7 @@ const CustomOrder = () => {
       </Grid>
 
       {/* Add Product Dialog */}
-      <Dialog open={productDialogOpen} onClose={handleCloseProductDialog} maxWidth="sm" fullWidth>
+      <Dialog open={productDialogOpen} onClose={handleCloseProductDialog} maxWidth="md" fullWidth>
         <DialogTitle>Add Product to Order</DialogTitle>
         <DialogContent>
           <Autocomplete
@@ -744,7 +813,9 @@ const CustomOrder = () => {
                   <Box>
                     <Typography variant="body1">{option.name}</Typography>
                     <Typography variant="body2" color="textSecondary">
-                      ₹{option.price.toFixed(2)} - Stock: {option.stock_quantity} - {option.category}
+                      {option.has_price_options ? 
+                        `From ₹${Math.min(...option.price_options.map(opt => opt.price)).toFixed(2)}` : 
+                        `₹${option.price.toFixed(2)}`} - Stock: {option.stock_quantity} - {option.category}
                     </Typography>
                   </Box>
                 </Box>
@@ -754,6 +825,63 @@ const CustomOrder = () => {
 
           {selectedProduct && (
             <>
+              {selectedProduct.has_price_options ? (
+                <Box className="mt-4 p-3 border rounded">
+                  <FormControl component="fieldset" fullWidth>
+                    <FormLabel component="legend">Select Option Type</FormLabel>
+                    <RadioGroup 
+                      row
+                      name="option-type" 
+                      value={optionType} 
+                      onChange={handleOptionTypeChange}
+                    >
+                      <FormControlLabel value="box" control={<Radio />} label="Box" />
+                      <FormControlLabel value="quantity" control={<Radio />} label="By Dozen" />
+                    </RadioGroup>
+                  </FormControl>
+
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>Select Size</InputLabel>
+                    <Select
+                      value={selectedOption?.size || ''}
+                      onChange={handleOptionChange}
+                      label="Select Size"
+                    >
+                      {selectedProduct.price_options
+                        .filter(opt => opt.type === optionType)
+                        .map((opt, idx) => (
+                          <MenuItem key={idx} value={opt.size}>
+                            {opt.size} - {opt.quantity} - ₹{opt.price.toFixed(2)}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+
+                  {selectedOption && (
+                    <Box className="mt-3">
+                      <Typography variant="subtitle2" gutterBottom>
+                        Selected Option Details:
+                      </Typography>
+                      <Grid container spacing={1}>
+                        <Grid item xs={4}>
+                          <Typography variant="body2">Size: {selectedOption.size}</Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Typography variant="body2">Quantity: {selectedOption.quantity}</Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Typography variant="body2">Price: ₹{selectedOption.price.toFixed(2)}</Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                <Typography variant="body1" className="mt-4">
+                  Price: ₹{selectedProduct.price.toFixed(2)}
+                </Typography>
+              )}
+
               <Box className="mt-4">
                 <Typography variant="subtitle2" gutterBottom>
                   Quantity: (Available: {selectedProduct.stock_quantity})
@@ -823,22 +951,17 @@ const CustomOrder = () => {
               
               <Box className="mt-4 flex justify-between">
                 <Typography>
-                  Price: ₹{useCustomItemRate ? customItemRate.toFixed(2) : selectedProduct.price.toFixed(2)}
+                  Price: ₹{useCustomItemRate ? 
+                    customItemRate.toFixed(2) : 
+                    (selectedOption ? selectedOption.price.toFixed(2) : selectedProduct.price.toFixed(2))}
                 </Typography>
                 <Typography>
-                  Subtotal: ₹{(useCustomItemRate ? customItemRate : selectedProduct.price * selectedQuantity).toFixed(2)}
+                  Subtotal: ₹{(useCustomItemRate ? 
+                    customItemRate * selectedQuantity : 
+                    (selectedOption ? selectedOption.price * selectedQuantity : selectedProduct.price * selectedQuantity))
+                    .toFixed(2)}
                 </Typography>
               </Box>
-              
-              {useCustomItemRate && selectedProduct && customItemRate !== selectedProduct.price && (
-                <Box className="mt-2 p-2 bg-orange-50 rounded">
-                  <Typography variant="body2" color="warning.main">
-                    {customItemRate > selectedProduct.price ? 'Price increased by ' : 'Price decreased by '}
-                    {Math.abs(customItemRate - selectedProduct.price).toFixed(2)} (
-                    {Math.round(Math.abs((customItemRate / selectedProduct.price - 1) * 100))}%)
-                  </Typography>
-                </Box>
-              )}
             </>
           )}
         </DialogContent>
@@ -850,7 +973,7 @@ const CustomOrder = () => {
             onClick={handleAddProductToOrder} 
             variant="contained" 
             color="primary"
-            disabled={!selectedProduct}
+            disabled={!selectedProduct || (selectedProduct.has_price_options && !selectedOption && !useCustomItemRate)}
           >
             Add to Order
           </Button>

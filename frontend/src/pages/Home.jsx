@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Container, Typography, Box, Grid, CircularProgress, 
-  Paper, Button, Card, CardMedia, CardContent, useTheme
+  Paper, Button, Card, CardMedia, CardContent, useTheme,
+  Tabs, Tab
 } from '@mui/material';
 import ProductCard from '../components/ProductCard';
 import api from '../utils/api';
@@ -24,11 +25,13 @@ const StyledHeroBox = styled(Box)(({ theme }) => ({
 }));
 
 const Home = () => {
-  const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { isAuthenticated } = useAuth();
   const theme = useTheme();
+  const productsRef = useRef(null);
+  const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -38,7 +41,7 @@ const Home = () => {
     const fetchProducts = async () => {
       try {
         const response = await api.get('/products');
-        setProducts(response.data);
+        setAllProducts(response.data);
       } catch (error) {
         setError('Failed to fetch products. Please try again later.');
         console.error('Error fetching products:', error);
@@ -49,6 +52,22 @@ const Home = () => {
 
     fetchProducts();
   }, []);
+  
+  // Separate seasonal and regular products
+  const seasonalProducts = allProducts.filter(product => product.is_seasonal);
+  const regularProducts = allProducts.filter(product => !product.is_seasonal);
+  
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+  
+  const scrollToProducts = () => {
+    if (productsRef.current) {
+      productsRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+  
+  const displayProducts = tabValue === 0 ? seasonalProducts : regularProducts;
 
   return (
     <div>
@@ -87,8 +106,7 @@ const Home = () => {
               variant="contained" 
               size="large" 
               color="secondary"
-              component={Link}
-              to={isAuthenticated ? "/cart" : "/login"}
+              onClick={scrollToProducts}
               endIcon={<ShoppingCartIcon />}
               sx={{
                 fontWeight: 'bold',
@@ -104,33 +122,45 @@ const Home = () => {
 
       {/* Products Section */}
       <Box 
+        ref={productsRef}
         sx={{
           py: 8,
           px: 2,
-          bgcolor: theme.palette.background.default
+          bgcolor: theme.palette.background.default,
+          scrollMarginTop: '100px' // For smooth scrolling offset
         }}
+        id="products"
       >
         <Container maxWidth="xl">
-          <Box className="flex justify-between items-center mb-6">
-            <Typography variant="h3" component="h2" gutterBottom>
-              Our Organic Products
-            </Typography>
+          <Box className="flex flex-col md:flex-row justify-between items-center md:items-end mb-6">
+            <Box className="mb-4 md:mb-0">
+              <Typography variant="h3" component="h2" gutterBottom>
+                Our Organic Products
+              </Typography>
+              <Typography variant="body1" paragraph>
+                All the fruits and veggies are grown without chemical pesticides and fertilisers,
+                ensuring you get the healthiest, most flavorful produce possible.
+              </Typography>
+            </Box>
             <Button 
               variant="contained" 
               color="primary"
               component={Link}
               to={isAuthenticated ? "/cart" : "/login"}
               endIcon={<ShoppingCartIcon />}
+              className="mb-4 md:mb-0 md:ml-4"
             >
-              Click to Order
+              View Cart
             </Button>
           </Box>
-          
-          <Typography variant="body1" paragraph className="mb-8 mx-auto" sx={{ maxWidth: '900px' }}>
-            All the fruits and veggies are grown without chemical pesticides and fertilisers,
-            ensuring you get the healthiest, most flavorful produce possible.
-          </Typography>
 
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
+            <Tabs value={tabValue} onChange={handleTabChange} aria-label="product categories">
+              <Tab label="Seasonal Mangoes" />
+              <Tab label="Regular Products" />
+            </Tabs>
+          </Box>
+          
           {loading ? (
             <Box display="flex" justifyContent="center" p={4}>
               <CircularProgress />
@@ -140,13 +170,36 @@ const Home = () => {
               {error}
             </Paper>
           ) : (
-            <Grid container spacing={4}>
-              {products.map((product) => (
-                <Grid item key={product.id} xs={12} sm={6} md={4} lg={3}>
-                  <ProductCard product={product} />
-                </Grid>
-              ))}
-            </Grid>
+            <>
+              {displayProducts.length === 0 ? (
+                <Paper className="p-8 text-center">
+                  <Typography variant="h6" color="textSecondary">
+                    {tabValue === 0 ? "No seasonal products available at the moment" : "No regular products available"}
+                  </Typography>
+                </Paper>
+              ) : (
+                <Box className="overflow-x-auto pb-4" sx={{ overflowY: 'hidden' }}>
+                  <Box sx={{ 
+                    display: 'flex',
+                    flexWrap: { xs: 'nowrap', md: 'wrap' },
+                    gap: 3,
+                    width: { xs: 'max-content', md: '100%' }
+                  }}>
+                    {displayProducts.map((product) => (
+                      <Box 
+                        key={product.id} 
+                        sx={{ 
+                          width: { xs: '280px', sm: '300px', md: 'calc(33.333% - 16px)', lg: 'calc(25% - 16px)' },
+                          minWidth: { xs: '280px', sm: '300px', md: '0' }
+                        }}
+                      >
+                        <ProductCard product={product} />
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </>
           )}
         </Container>
       </Box>
@@ -209,36 +262,6 @@ const Home = () => {
           <Typography variant="h3" component="h2" align="center" gutterBottom>
             About Avani Mitra
           </Typography>
-          {/* <Typography variant="body1" paragraph className="text-center mb-8">
-            Avani Mitra is dedicated to cultivating the finest organic fruits using sustainable 
-            farming practices that respect our environment and promote biodiversity.
-          </Typography>
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={4}>
-              <Box className="text-center">
-                <Typography variant="h6" gutterBottom>Organic Certified</Typography>
-                <Typography variant="body2">
-                  All our produce is certified organic, meeting the strictest standards in the industry.
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Box className="text-center">
-                <Typography variant="h6" gutterBottom>Farm to Table</Typography>
-                <Typography variant="body2">
-                  We deliver directly from our farms to your doorstep, ensuring maximum freshness.
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Box className="text-center">
-                <Typography variant="h6" gutterBottom>Sustainable Practices</Typography>
-                <Typography variant="body2">
-                  Our farming methods preserve soil health and promote ecological balance.
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid> */}
           
           <Box className="mt-8 text-center">
             <Button 
