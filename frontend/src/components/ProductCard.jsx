@@ -1,3 +1,4 @@
+// frontend/src/components/ProductCard.jsx
 import { useState } from 'react';
 import { 
   Card, CardContent, CardMedia, Typography, Button, 
@@ -62,7 +63,8 @@ const ProductCard = ({ product }) => {
         type: selectedOption.type,
         size: selectedOption.size,
         quantity: selectedOption.quantity,
-        price: selectedOption.price
+        price: selectedOption.price,
+        old_price: selectedOption.old_price
       };
     }
     
@@ -103,6 +105,54 @@ const ProductCard = ({ product }) => {
       setSelectedOption(newOption);
     }
   };
+
+  // Helper function to render price with discount if available
+  const renderPrice = (price, oldPrice) => {
+    if (oldPrice && oldPrice > price) {
+      return (
+        <Box className="flex items-center gap-2">
+          <Typography variant="body1" color="text.secondary" className="line-through">
+            ₹{oldPrice.toFixed(2)}
+          </Typography>
+          <Typography variant="h6" color="primary">
+            ₹{price.toFixed(2)}
+          </Typography>
+        </Box>
+      );
+    }
+    return (
+      <Typography variant="h6" color="primary">
+        ₹{price.toFixed(2)}
+      </Typography>
+    );
+  };
+
+  // Get minimum price and its corresponding old price for display in card
+  const getMinPriceInfo = () => {
+    if (product.has_price_options && product.price_options?.length > 0) {
+      let minPrice = Infinity;
+      let correspondingOldPrice = null;
+      
+      product.price_options.forEach(option => {
+        if (option.price < minPrice) {
+          minPrice = option.price;
+          correspondingOldPrice = option.old_price || null;
+        }
+      });
+      
+      return {
+        price: minPrice,
+        oldPrice: correspondingOldPrice
+      };
+    }
+    
+    return {
+      price: product.price,
+      oldPrice: product.old_price
+    };
+  };
+
+  const priceInfo = getMinPriceInfo();
 
   return (
     <>
@@ -145,15 +195,18 @@ const ProductCard = ({ product }) => {
             {product.description}
           </Typography>
           <Box className="flex justify-between items-center mt-2">
-            {product.has_price_options ? (
-              <Typography variant="h6" color="primary">
-                From ₹{Math.min(...product.price_options.map(opt => opt.price)).toFixed(2)}
-              </Typography>
-            ) : (
-              <Typography variant="h6" color="primary">
-                ₹{product.price.toFixed(2)}
-              </Typography>
-            )}
+            <Box>
+              {product.has_price_options ? (
+                <Box className="flex items-center">
+                  <Typography variant="body2" color="text.secondary">
+                    From{' '}
+                  </Typography>
+                  {renderPrice(priceInfo.price, priceInfo.oldPrice)}
+                </Box>
+              ) : (
+                renderPrice(product.price, product.old_price)
+              )}
+            </Box>
             <Button 
               color="inherit" 
               onClick={handleOpen}
@@ -236,16 +289,14 @@ const ProductCard = ({ product }) => {
                       <Typography variant="body2" gutterBottom>
                         <strong>Quantity:</strong> {selectedOption.quantity}
                       </Typography>
-                      <Typography variant="h6" color="primary">
-                        ₹{selectedOption.price.toFixed(2)}
-                      </Typography>
+                      <Box className="mt-2">
+                        {renderPrice(selectedOption.price, selectedOption.old_price)}
+                      </Box>
                     </Box>
                   )}
                 </Box>
               ) : (
-                <Typography variant="h6" color="primary" gutterBottom>
-                  ₹{product.price.toFixed(2)}
-                </Typography>
+                renderPrice(product.price, product.old_price)
               )}
               
               {product.stock_quantity > 0 ? (

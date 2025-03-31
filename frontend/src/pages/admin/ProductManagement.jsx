@@ -1,3 +1,4 @@
+// frontend/src/pages/admin/ProductManagement.jsx
 import { useState, useEffect } from 'react';
 import {
   Container, Typography, Box, Paper, Button, TextField, Grid,
@@ -26,6 +27,7 @@ const ProductManagement = () => {
     name: '',
     description: '',
     price: '',
+    old_price: '',
     stock_quantity: '',
     category: '',
     image_url: '',
@@ -57,13 +59,15 @@ const ProductManagement = () => {
         type: 'box',
         size: 'small',
         quantity: '6.5/7 Dz',
-        price: 5300
+        price: 5300,
+        old_price: null
       },
       {
         type: 'quantity',
         size: 'small',
         quantity: '1 Dz',
-        price: 850
+        price: 850,
+        old_price: null
       }
     ],
     medium: [
@@ -71,13 +75,15 @@ const ProductManagement = () => {
         type: 'box',
         size: 'medium',
         quantity: '5.5/6 Dz',
-        price: 6300
+        price: 6300,
+        old_price: null
       },
       {
         type: 'quantity',
         size: 'medium',
         quantity: '1 Dz',
-        price: 1200
+        price: 1200,
+        old_price: null
       }
     ],
     big: [
@@ -85,13 +91,15 @@ const ProductManagement = () => {
         type: 'box',
         size: 'big',
         quantity: '5/5.25 Dz',
-        price: 7400
+        price: 7400,
+        old_price: null
       },
       {
         type: 'quantity',
         size: 'big',
         quantity: '1 Dz',
-        price: 1550
+        price: 1550,
+        old_price: null
       }
     ]
   };
@@ -127,9 +135,10 @@ const ProductManagement = () => {
         name: product.name,
         description: product.description,
         price: product.price.toString(),
+        old_price: product.old_price ? product.old_price.toString() : '',
         stock_quantity: product.stock_quantity.toString(),
         category: product.category,
-        image_url: product. image_url,
+        image_url: product.image_url,
         status: product.status,
         is_seasonal: product.is_seasonal || false,
         has_price_options: product.has_price_options || false,
@@ -140,6 +149,7 @@ const ProductManagement = () => {
         name: '',
         description: '',
         price: '',
+        old_price: '',
         stock_quantity: '',
         category: '',
         image_url: '',
@@ -212,9 +222,15 @@ const ProductManagement = () => {
   
   const handlePriceOptionChange = (index, field, value) => {
     const updatedOptions = [...formData.price_options];
+    
+    // Convert to number for price fields
+    if (field === 'price' || field === 'old_price') {
+      value = value === '' ? null : parseFloat(value);
+    }
+    
     updatedOptions[index] = {
       ...updatedOptions[index],
-      [field]: field === 'price' ? parseFloat(value) : value
+      [field]: value
     };
     
     setFormData({
@@ -228,7 +244,8 @@ const ProductManagement = () => {
       type: 'box', // default type
       size: formData.category === 'mangoes' ? 'medium' : '',
       quantity: '',
-      price: parseFloat(formData.price) || 0
+      price: parseFloat(formData.price) || 0,
+      old_price: formData.old_price ? parseFloat(formData.old_price) : null
     };
     
     setFormData({
@@ -255,6 +272,16 @@ const ProductManagement = () => {
     else if (isNaN(formData.price) || parseFloat(formData.price) <= 0) {
       errors.price = 'Price must be a positive number';
     }
+    
+    // Old price validation - must be greater than current price or empty
+    if (formData.old_price && !isNaN(formData.old_price)) {
+      const oldPrice = parseFloat(formData.old_price);
+      const currentPrice = parseFloat(formData.price);
+      if (oldPrice <= currentPrice) {
+        errors.old_price = 'Old price should be greater than current price';
+      }
+    }
+    
     if (!formData.stock_quantity) errors.stock_quantity = 'Stock quantity is required';
     else if (isNaN(formData.stock_quantity) || parseInt(formData.stock_quantity) < 0) {
       errors.stock_quantity = 'Stock quantity must be a non-negative number';
@@ -265,6 +292,25 @@ const ProductManagement = () => {
     
     if (formData.has_price_options && formData.price_options.length === 0) {
       errors.price_options = 'At least one price option is required';
+    }
+    
+    // Validate each price option
+    if (formData.has_price_options && formData.price_options.length > 0) {
+      const optionErrors = [];
+      
+      formData.price_options.forEach((option, index) => {
+        if (!option.type || !option.size || !option.quantity || !option.price) {
+          optionErrors.push(`Option #${index + 1} is missing required fields`);
+        }
+        
+        if (option.old_price && option.price >= option.old_price) {
+          optionErrors.push(`Option #${index + 1}: Old price must be greater than current price`);
+        }
+      });
+      
+      if (optionErrors.length > 0) {
+        errors.price_options = optionErrors.join(', ');
+      }
     }
     
     setFormErrors(errors);
@@ -283,6 +329,7 @@ const ProductManagement = () => {
       const payload = {
         ...formData,
         price: parseFloat(formData.price),
+        old_price: formData.old_price ? parseFloat(formData.old_price) : null,
         stock_quantity: parseInt(formData.stock_quantity)
       };
       
@@ -340,6 +387,23 @@ const ProductManagement = () => {
       setIsSubmitting(false);
       handleCloseDeleteDialog();
     }
+  };
+  
+  // Helper function to display price with discount
+  const renderPriceDisplay = (price, oldPrice) => {
+    if (oldPrice && oldPrice > price) {
+      return (
+        <Box className="flex flex-col">
+          <Typography variant="body2" color="text.secondary" className="line-through">
+            ₹{oldPrice.toFixed(2)}
+          </Typography>
+          <Typography variant="body1" color="primary.main" fontWeight="bold">
+            ₹{price.toFixed(2)}
+          </Typography>
+        </Box>
+      );
+    }
+    return <span>₹{price.toFixed(2)}</span>;
   };
   
   return (
@@ -407,9 +471,19 @@ const ProductManagement = () => {
                   <TableCell>{product.category}</TableCell>
                   <TableCell align="right">
                     {product.has_price_options ? (
-                      <span>From {Math.min(...product.price_options.map(opt => opt.price)).toFixed(2)}</span>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          From
+                        </Typography>
+                        {renderPriceDisplay(
+                          Math.min(...product.price_options.map(opt => opt.price)),
+                          product.price_options.find(opt => 
+                            opt.price === Math.min(...product.price_options.map(o => o.price))
+                          )?.old_price
+                        )}
+                      </Box>
                     ) : (
-                      product.price.toFixed(2)
+                      renderPriceDisplay(product.price, product.old_price)
                     )}
                   </TableCell>
                   <TableCell align="right">{product.stock_quantity}</TableCell>
@@ -512,7 +586,7 @@ const ProductManagement = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 name="price"
-                label="Base Price (₹)"
+                label="Current Price (₹)"
                 fullWidth
                 type="number"
                 value={formData.price}
@@ -525,6 +599,20 @@ const ProductManagement = () => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
+                name="old_price"
+                label="Old Price (₹) (Optional)"
+                fullWidth
+                type="number"
+                value={formData.old_price}
+                onChange={handleInputChange}
+                error={!!formErrors.old_price}
+                helperText={formErrors.old_price || "Leave empty if no discount"}
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
                 name="stock_quantity"
                 label="Stock Quantity"
                 fullWidth
@@ -534,19 +622,6 @@ const ProductManagement = () => {
                 error={!!formErrors.stock_quantity}
                 helperText={formErrors.stock_quantity}
                 inputProps={{ min: 0, step: 1 }}
-                required
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="image_url"
-                label="Image URL"
-                fullWidth
-                value={formData.image_url}
-                onChange={handleInputChange}
-                error={!!formErrors.image_url}
-                helperText={formErrors.image_url}
                 required
               />
             </Grid>
@@ -571,6 +646,19 @@ const ProductManagement = () => {
                   </Typography>
                 )}
               </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                name="image_url"
+                label="Image URL"
+                fullWidth
+                value={formData.image_url}
+                onChange={handleInputChange}
+                error={!!formErrors.image_url}
+                helperText={formErrors.image_url}
+                required
+              />
             </Grid>
             
             <Grid item xs={12} sm={6}>
@@ -628,7 +716,15 @@ const ProductManagement = () => {
                       <Accordion key={index} className="mt-2">
                         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                           <Typography>
-                            Option {index + 1}: {option.type} - {option.size} - {option.quantity} - ₹{option.price}
+                            Option {index + 1}: {option.type} - {option.size} - {option.quantity} - 
+                            {option.old_price && option.old_price > option.price ? (
+                              <span>
+                                <span className="line-through mr-1">₹{option.old_price}</span>
+                                <span className="text-green-600">₹{option.price}</span>
+                              </span>
+                            ) : (
+                              <span>₹{option.price}</span>
+                            )}
                           </Typography>
                         </AccordionSummary>
                         <AccordionDetails>
@@ -676,6 +772,17 @@ const ProductManagement = () => {
                                 value={option.price}
                                 onChange={(e) => handlePriceOptionChange(index, 'price', e.target.value)}
                                 inputProps={{ min: 0, step: 0.01 }}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                label="Old Price (₹) (Optional)"
+                                fullWidth
+                                type="number"
+                                value={option.old_price || ""}
+                                onChange={(e) => handlePriceOptionChange(index, 'old_price', e.target.value)}
+                                inputProps={{ min: 0, step: 0.01 }}
+                                helperText="Leave empty if no discount"
                               />
                             </Grid>
                             <Grid item xs={12} className="flex justify-end">

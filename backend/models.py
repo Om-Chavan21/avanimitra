@@ -1,3 +1,5 @@
+# backend/models.py
+
 from pydantic import BaseModel, Field, EmailStr, validator
 import re
 from typing import Optional, List, Dict, Any, Union
@@ -10,6 +12,7 @@ class PriceOption(BaseModel):
     size: str  # "small", "medium", "big"
     quantity: str  # e.g., "6.5/7 Dz", "1 Dz"
     price: float
+    old_price: Optional[float] = None
 
 
 class UserBase(BaseModel):
@@ -67,6 +70,7 @@ class ProductBase(BaseModel):
     name: str
     description: str
     price: float
+    old_price: Optional[float] = None
     image_url: str
     category: str
     stock_quantity: int
@@ -84,6 +88,7 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     price: Optional[float] = None
+    old_price: Optional[float] = None
     image_url: Optional[str] = None
     category: Optional[str] = None
     stock_quantity: Optional[int] = None

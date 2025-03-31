@@ -1,5 +1,6 @@
 farm-stack-course/venv
 .env
+venv
 
 node_modules/
 public-archive/
@@ -12,6 +13,7 @@ __pycache__/
 .netlify
 
 prompt*
+ecommerce*
 commands.txt
 tasks.txt
 file_contents.txt

@@ -89,6 +89,13 @@ async def update_product(
         )
     # Update product
     update_data = {k: v for k, v in product.dict().items() if v is not None}
+    # Handle case when old_price is explicitly set to None to remove it
+    if 'old_price' in update_data and update_data['old_price'] is None:
+        await products_collection.update_one(
+            {"_id": ObjectId(product_id)}, {"$unset": {"old_price": ""}}
+        )
+        del update_data['old_price']
+        
     if update_data:
         await products_collection.update_one(
             {"_id": ObjectId(product_id)}, {"$set": update_data}
@@ -235,6 +242,7 @@ async def seed_products():
             "name": "Organic Apples",
             "description": "Fresh, juicy organic apples sourced directly from our farms",
             "price": 150.0,  # ₹150 per kg
+            "old_price": 180.0,  # Added old_price for demonstration
             "image_url": "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb",
             "category": "apples",
             "stock_quantity": 100,
@@ -255,6 +263,7 @@ async def seed_products():
             "name": "Organic Oranges",
             "description": "Citrusy and refreshing organic oranges",
             "price": 120.0,  # ₹120 per kg
+            "old_price": 150.0,  # Added old_price for demonstration
             "image_url": "https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b",
             "category": "citrus",
             "stock_quantity": 80,
@@ -276,7 +285,8 @@ async def seed_products():
                     "type": "box",
                     "size": "small",
                     "quantity": "6.5/7 Dz",
-                    "price": 5300
+                    "price": 5300,
+                    "old_price": 5800
                 },
                 {
                     "type": "quantity",
@@ -307,7 +317,8 @@ async def seed_products():
                     "type": "quantity",
                     "size": "medium",
                     "quantity": "1 Dz",
-                    "price": 1200
+                    "price": 1200,
+                    "old_price": 1400
                 }
             ]
         },
@@ -326,13 +337,15 @@ async def seed_products():
                     "type": "box",
                     "size": "big",
                     "quantity": "5/5.25 Dz",
-                    "price": 7400
+                    "price": 7400,
+                    "old_price": 7900
                 },
                 {
                     "type": "quantity",
                     "size": "big",
                     "quantity": "1 Dz",
-                    "price": 1550
+                    "price": 1550,
+                    "old_price": 1700
                 }
             ]
         },
