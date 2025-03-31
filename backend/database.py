@@ -9,7 +9,7 @@ load_dotenv()
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URI)
-database = client.ecommerce
+database = client["ecommerce-dev"]
 
 users_collection = database.users
 products_collection = database.products
