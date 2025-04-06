@@ -1,8 +1,9 @@
+// src/pages/Home.jsx
 import { useState, useEffect, useRef } from 'react';
 import { 
   Container, Typography, Box, Grid, CircularProgress, 
   Paper, Button, Card, CardMedia, CardContent, useTheme,
-  Tabs, Tab
+  Tabs, Tab, Avatar
 } from '@mui/material';
 import ProductCard from '../components/ProductCard';
 import api from '../utils/api';
@@ -13,6 +14,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { styled } from '@mui/material/styles';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import PhoneIcon from '@mui/icons-material/Phone';
+import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 
 const StyledHeroBox = styled(Box)(({ theme }) => ({
   backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7)), url(${heroImage})`,
@@ -68,6 +70,31 @@ const Home = () => {
   };
   
   const displayProducts = tabValue === 0 ? seasonalProducts : regularProducts;
+
+  // // Testimonials data
+  // const testimonials = [
+  //   {
+  //     id: 1,
+  //     name: "Meera Sharma",
+  //     role: "Regular Customer",
+  //     content: "I've been ordering mangoes from Avani Mitra for two seasons now, and the quality is outstanding. The taste is exactly what I remember from my childhood - sweet, juicy, and full of flavor!",
+  //     avatar: "MS"
+  //   },
+  //   {
+  //     id: 2,
+  //     name: "Raj Patel",
+  //     role: "Loyal Customer",
+  //     content: "The organic products from Avani Mitra have transformed our family's diet. The freshness is unmatched, and knowing these come directly from farmers makes me even happier to support them.",
+  //     avatar: "RP"
+  //   },
+  //   {
+  //     id: 3,
+  //     name: "Anjali Desai",
+  //     role: "Food Enthusiast",
+  //     content: "Their seasonal mangoes are the highlight of summer! Delivery was prompt, and the fruit was perfectly ripened. Will definitely order again next season!",
+  //     avatar: "AD"
+  //   }
+  // ];
 
   return (
     <div>
@@ -132,16 +159,17 @@ const Home = () => {
         id="products"
       >
         <Container maxWidth="xl">
-          <Box className="flex flex-col md:flex-row justify-between items-center md:items-end mb-6">
-            <Box className="mb-4 md:mb-0">
-              <Typography variant="h3" component="h2" gutterBottom>
-                Our Organic Products
-              </Typography>
-              <Typography variant="body1" paragraph>
-                All the fruits and veggies are grown without chemical pesticides and fertilisers,
-                ensuring you get the healthiest, most flavorful produce possible.
-              </Typography>
-            </Box>
+        <Box className="flex flex-col md:flex-row justify-between items-center md:items-end mb-6">
+          <Box className="mb-4 md:mb-0">
+            <Typography variant="h3" component="h2" gutterBottom>
+              Our Organic Products
+            </Typography>
+            <Typography variant="body1" paragraph>
+              All the fruits and veggies are grown without chemical pesticides and fertilisers,
+              ensuring you get the healthiest, most flavorful produce possible.
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Button 
               variant="contained" 
               color="primary"
@@ -152,7 +180,21 @@ const Home = () => {
             >
               View Cart
             </Button>
+            <Typography 
+              variant="body2" 
+              sx={{
+                mt: 1, 
+                textAlign: { xs: 'center', md: 'center' }, 
+                fontStyle: 'italic', 
+                color: '#ff7777', 
+                maxWidth: { md: 300 }, 
+              }}
+            >
+              For home delivery, charges at actual cost will be communicated during delivery
+            </Typography>
           </Box>
+        </Box>
+
 
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="product categories">
@@ -203,6 +245,59 @@ const Home = () => {
           )}
         </Container>
       </Box>
+
+      {/* Testimonials Section
+      <Box sx={{ 
+        py: 8, 
+        bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 128, 0, 0.05)'
+      }}>
+        <Container maxWidth="lg">
+          <Typography 
+            variant="h3" 
+            component="h2" 
+            align="center" 
+            gutterBottom
+            sx={{ mb: 5 }}
+          >
+            What Our Customers Say
+          </Typography>
+          
+          <Grid container spacing={4}>
+            {testimonials.map((testimonial) => (
+              <Grid item xs={12} md={4} key={testimonial.id}>
+                <Card sx={{ 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  p: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  borderRadius: 2
+                }}>
+                  <Box sx={{ display: 'flex', mb: 2 }}>
+                    <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
+                      {testimonial.avatar}
+                    </Avatar>
+                    <Box sx={{ ml: 2 }}>
+                      <Typography variant="h6">{testimonial.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">{testimonial.role}</Typography>
+                    </Box>
+                  </Box>
+                  <FormatQuoteIcon 
+                    sx={{ 
+                      fontSize: 30, 
+                      color: theme.palette.primary.light,
+                      mb: 1
+                    }} 
+                  />
+                  <Typography variant="body1" sx={{ flexGrow: 1 }}>
+                    {testimonial.content}
+                  </Typography>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Container>
+      </Box> */}
 
       {/* Contact Section */}
       <Box sx={{ 

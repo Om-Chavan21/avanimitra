@@ -1,13 +1,15 @@
+// src/pages/Cart.jsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container, Typography, Box, Paper, Grid, Button, Divider,
   Card, CardContent, CardMedia, IconButton, TextField, CircularProgress,
-  Alert, Chip
+  Alert, Chip, Tooltip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import DeleteIcon from '@mui/icons-material/Delete';
+import InfoIcon from '@mui/icons-material/Info';
 import InputAdornment from '@mui/material/InputAdornment';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -207,17 +209,28 @@ const Cart = () => {
                 <Typography variant="body1">₹{cart.total_price.toFixed(2)}</Typography>
               </Box>
               
-              <Box className="flex justify-between py-2">
-                <Typography variant="body1">Delivery Fee</Typography>
-                <Typography variant="body1">₹0.00</Typography>
+              <Box className="flex justify-between py-2 items-center">
+                <Box className="flex items-center">
+                  <Typography variant="body1">Delivery Fee</Typography>
+                  <Tooltip title="Actual delivery charges will be communicated at the time of delivery based on your location">
+                    <IconButton size="small">
+                      <InfoIcon fontSize="small" color="primary" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Typography variant="body1">To be confirmed</Typography>
               </Box>
               
               <Divider className="my-2" />
               
               <Box className="flex justify-between py-2">
                 <Typography variant="h6">Total</Typography>
-                <Typography variant="h6" color="primary">₹{cart.total_price.toFixed(2)}</Typography>
+                <Typography variant="h6" color="primary">₹{cart.total_price.toFixed(2)} + Delivery</Typography>
               </Box>
+              
+              <Typography variant="body2" color="#ff7777" sx={{ mt: 1, fontStyle: 'italic' }}>
+                * Delivery charges to be paid at the time of delivery for home delivery
+              </Typography>
               
               <Box className="mt-4">
                 <Typography variant="h6" gutterBottom>
