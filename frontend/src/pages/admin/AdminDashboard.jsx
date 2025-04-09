@@ -6,6 +6,7 @@ import {
   Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
   DialogContentText, Snackbar, Alert
 } from '@mui/material';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import PeopleIcon from '@mui/icons-material/People';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
@@ -367,9 +368,18 @@ const AdminDashboard = () => {
                   >
                     Create Order
                   </Button>
+                  <Button 
+                    variant="contained" 
+                    component={Link} 
+                    to="/admin/export-orders"
+                    className="w-full" 
+                    startIcon={<FileDownloadIcon />}
+                  >
+                    Export Orders
+                  </Button>
                   <Button
                     variant="contained"
-                    className="w-full sm:col-span-2"
+                    className="w-full"
                     startIcon={<DownloadIcon />}
                     onClick={handleDownloadClick}
                     disabled={downloadLoading}

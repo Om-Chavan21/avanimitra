@@ -1,11 +1,12 @@
+// frontend/src/pages/admin/OrderExport.jsx
+
 import { useState } from 'react';
 import {
-  Container, Typography, Box, Paper, Grid, TextField, Button,
+  Container, Typography, Box, Paper, Grid, Button,
   CircularProgress, Alert, FormControl, InputLabel, Select, MenuItem,
-  FormHelperText, FormControlLabel
+  FormHelperText, FormControlLabel, Switch
 } from '@mui/material';
-import { Switch } from '@mui/base';
-import DatePicker from '@mui/lab/DatePicker';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import api from '../../utils/api';
@@ -15,14 +16,12 @@ const OrderExport = () => {
     format: 'excel',
     start_date: null,
     end_date: null,
-    email: '',
-    include_all_fields: true,
-    status_filter: 'all'
+    status_filter: 'all',
+    include_all_fields: true
   });
   
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -45,14 +44,33 @@ const OrderExport = () => {
     try {
       setSubmitting(true);
       setError('');
-      setSuccess('');
       
       const token = localStorage.getItem('token');
-      await api.post('/admin/export-orders', exportData, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await api.post('/admin/export-orders', exportData, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
       });
       
-      setSuccess(`Orders export has been initiated! An email will be sent to ${exportData.email} with the export file.`);
+      // Create a download link and click it
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from headers if possible
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `orders_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+      if (contentDisposition) {
+        const matches = /filename=([^;]+)/ig.exec(contentDisposition);
+        if (matches && matches.length > 1) {
+          filename = matches[1].replace(/"/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
     } catch (err) {
       setError(`Failed to export orders: ${err.response?.data?.detail || err.message}`);
     } finally {
@@ -68,7 +86,7 @@ const OrderExport = () => {
         </Typography>
         
         <Typography variant="body1" paragraph>
-          Generate and export order data to Excel or Google Sheets. The exported file will be sent to your email.
+          Generate and export order data to Excel. The file will be downloaded directly to your device.
         </Typography>
         
         {error && (
@@ -77,32 +95,10 @@ const OrderExport = () => {
           </Alert>
         )}
         
-        {success && (
-          <Alert severity="success" className="mb-4" onClose={() => setSuccess('')}>
-            {success}
-          </Alert>
-        )}
-        
         <Paper className="p-6">
           <form onSubmit={handleSubmit}>
             <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Export Format</InputLabel>
-                  <Select
-                    name="format"
-                    value={exportData.format}
-                    onChange={handleChange}
-                    label="Export Format"
-                  >
-                    <MenuItem value="excel">Excel (.xlsx)</MenuItem>
-                    <MenuItem value="google_sheets">Google Sheets</MenuItem>
-                    <MenuItem value="csv">CSV</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12}>
                 <FormControl fullWidth>
                   <InputLabel>Filter by Status</InputLabel>
                   <Select
@@ -125,50 +121,35 @@ const OrderExport = () => {
                 <DatePicker
                   label="Start Date"
                   value={exportData.start_date}
-                  onChange={handleDateChange('start_date')}
-                  renderInput={(params) => <TextField {...params} fullWidth />}
+                  onChange={(newValue) => handleDateChange('start_date')(newValue)}
+                  slotProps={{ textField: { fullWidth: true } }}
                 />
               </Grid>
-              
+
               <Grid item xs={12} sm={6}>
                 <DatePicker
                   label="End Date"
                   value={exportData.end_date}
-                  onChange={handleDateChange('end_date')}
-                  renderInput={(params) => <TextField {...params} fullWidth />}
+                  onChange={(newValue) => handleDateChange('end_date')(newValue)}
+                  slotProps={{ textField: { fullWidth: true } }}
                   minDate={exportData.start_date}
                 />
               </Grid>
               
               <Grid item xs={12}>
-                <TextField
-                  label="Email Address"
-                  name="email"
-                  value={exportData.email}
-                  onChange={handleChange}
-                  fullWidth
-                  required
-                  type="email"
-                  helperText="The export file will be sent to this email address"
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={exportData.include_all_fields}
+                      onChange={handleChange}
+                      name="include_all_fields"
+                    />
+                  }
+                  label="Include all order fields"
                 />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={exportData.include_all_fields}
-                        onChange={handleChange}
-                        name="include_all_fields"
-                      />
-                    }
-                    label="Include all order fields"
-                  />
-                  <FormHelperText>
-                    If unchecked, only essential fields will be included in the export
-                  </FormHelperText>
-                </FormControl>
+                <FormHelperText>
+                  If unchecked, only essential fields will be included in the export
+                </FormHelperText>
               </Grid>
             </Grid>
             
@@ -180,7 +161,7 @@ const OrderExport = () => {
                 size="large"
                 disabled={submitting}
               >
-                {submitting ? <CircularProgress size={24} /> : 'Export Orders'}
+                {submitting ? <CircularProgress size={24} /> : 'Download Orders Report'}
               </Button>
             </Box>
           </form>

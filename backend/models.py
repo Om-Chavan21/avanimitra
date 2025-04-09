@@ -211,9 +211,8 @@ class PaymentSettingsResponse(PaymentSettingsBase):
 
 
 class OrderExportRequest(BaseModel):
-    format: str  # excel, csv, google_sheets
+    format: str = "excel"  # Default to excel
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
-    email: str
     include_all_fields: bool = True
     status_filter: str = "all"  # all, pending, processing, shipped, delivered, cancelled

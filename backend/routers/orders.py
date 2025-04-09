@@ -1,18 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, File, UploadFile, Form
+# backend/routers/orders.py
+
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, File, UploadFile, Form, Response
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
 from datetime import datetime, timedelta
 import pandas as pd
 import io
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-from os import environ, path
-import os
-import tempfile
-
 from models import (
     OrderCreate,
     OrderResponse,
@@ -413,7 +406,6 @@ async def create_custom_order(
 @router.post("/admin/export-orders")
 async def export_orders(
     export_data: OrderExportRequest,
-    background_tasks: BackgroundTasks,
     current_user: UserInDB = Depends(get_current_user),
 ):
     # Check if user is admin
@@ -440,186 +432,211 @@ async def export_orders(
         end_date = export_data.end_date + timedelta(days=1)
         filter_query["order_date"]["$lt"] = end_date
     
-    # Schedule the export job
-    background_tasks.add_task(
-        process_export_orders,
-        filter_query,
-        export_data.format,
-        export_data.email,
-        export_data.include_all_fields,
+    # Process the export immediately instead of in background
+    excel_data = await process_export_orders(filter_query)
+    
+    # Return the Excel file for download
+    filename = f"orders_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    
+    return Response(
+        content=excel_data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers
     )
-    
-    return {"message": "Order export has been scheduled. You will receive the file via email."}
 
 
-async def process_export_orders(
-    filter_query: Dict[str, Any],
-    format_type: str,
-    email: str,
-    include_all_fields: bool = True,
-):
-    """Process and export orders in the background"""
+async def process_export_orders(filter_query: Dict[str, Any]):
+    """Process orders and return the Excel file data with conditional formatting"""
     try:
-        # Fetch orders
-        orders = await orders_collection.find(filter_query).sort("order_date", -1).to_list(1000)
-        orders = serialize_list(orders)
+        # Create a BytesIO object to store the Excel file
+        output = io.BytesIO()
         
-        # Process orders to include product details
-        order_data = []
-        for order in orders:
-            # Get basic order data
-            order_row = {
-                "Order ID": order["id"],
-                "Date": order["order_date"],
-                "User ID": order["user_id"],
-                "Delivery Address": order["delivery_address"],
-                "Receiver Phone": order["receiver_phone"],
-                "Order Status": order["order_status"],
-                "Payment Status": order["payment_status"],
-                "Total Amount": order["total_amount"],
-            }
+        # Create Excel writer
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            # PART 1: Create "orders" sheet with the specified format (now first)
+            orders = await orders_collection.find(filter_query).sort("order_date", 1).to_list(1000)
+            orders = serialize_list(orders)
             
-            # Include payment method if available
-            if "payment_method" in order:
-                order_row["Payment Method"] = order["payment_method"]
+            # Process orders to include product details
+            processed_orders = []
+            order_number = 1
             
-            # Include discount info if available
-            if "discount" in order:
-                order_row["Discount Type"] = order["discount"].get("type")
-                order_row["Discount Value"] = order["discount"].get("value")
-                order_row["Original Total"] = order["discount"].get("original_total")
-            
-            # Process items
-            items_text = []
-            for idx, item in enumerate(order["items"]):
-                product = await products_collection.find_one({"_id": ObjectId(item["product_id"])})
-                if product:
-                    product_name = product["name"]
+            for order in orders:
+                if order is None:
+                    continue
+                
+                # Get user info
+                user_id = order.get("user_id")
+                if user_id is None:
+                    user = {"name": "Unknown", "phone": "", "address": ""}
                 else:
-                    product_name = f"Unknown Product ({item['product_id']})"
+                    user = await users_collection.find_one({"_id": ObjectId(user_id)})
+                    if user is None:
+                        user = {"name": "Unknown", "phone": "", "address": ""}
+                    user = serialize_doc_id(user)
                 
-                # Get option details if present
-                option_details = ""
-                if "selected_option" in item:
-                    option = item["selected_option"]
-                    option_details = f" ({option['type']} - {option['size']} - {option['quantity']})"
-                
-                item_text = f"{product_name}{option_details} x {item['quantity']} @ ₹{item['price_at_purchase']}"
-                items_text.append(item_text)
-                
-                # Add individual item details if all fields are included
-                if include_all_fields:
-                    order_row[f"Item {idx+1} Product ID"] = item["product_id"]
-                    order_row[f"Item {idx+1} Product Name"] = product_name
-                    order_row[f"Item {idx+1} Quantity"] = item["quantity"]
-                    order_row[f"Item {idx+1} Price"] = item["price_at_purchase"]
-                    order_row[f"Item {idx+1} Subtotal"] = item["price_at_purchase"] * item["quantity"]
+                # Process each item in the order
+                items = order.get("items", [])
+                for item in items:
+                    if item is None:
+                        continue
                     
-                    if "selected_option" in item:
-                        option = item["selected_option"]
-                        order_row[f"Item {idx+1} Option Type"] = option.get("type", "")
-                        order_row[f"Item {idx+1} Option Size"] = option.get("size", "")
-                        order_row[f"Item {idx+1} Option Quantity"] = option.get("quantity", "")
+                    product_id = item.get("product_id")
+                    if product_id is None:
+                        continue
+                    
+                    product = await products_collection.find_one({"_id": ObjectId(product_id)})
+                    if product is None:
+                        continue
+                    
+                    product = serialize_doc_id(product)
+                    
+                    # Get option details if present
+                    size = ""
+                    option_type = ""
+                    total_dozens = 0
+                    
+                    selected_option = item.get("selected_option")
+                    if selected_option is not None:
+                        size = selected_option.get("size", "")
+                        option_type = selected_option.get("type", "")
+                        
+                        # Calculate total dozens
+                        if option_type == "quantity":
+                            total_dozens = 1 * item.get("quantity", 0)
+                        elif option_type == "box":
+                            if size == "big":
+                                total_dozens = 5.5 * item.get("quantity", 0)
+                            elif size == "medium":
+                                total_dozens = 6 * item.get("quantity", 0)
+                            elif size == "small":
+                                total_dozens = 6.5 * item.get("quantity", 0)
+                    
+                    # Calculate if receiver_phone should be shown
+                    receiver_phone = ""
+                    if order.get("receiver_phone") != user.get("phone"):
+                        receiver_phone = order.get("receiver_phone", "")
+                    
+                    # Calculate if delivery_address should be shown
+                    delivery_address = ""
+                    if order.get("delivery_address") != user.get("address"):
+                        delivery_address = order.get("delivery_address", "")
+                    
+                    # Create row for the order item
+                    order_row = {
+                        "round_number": "",
+                        "website_order_number": order_number,
+                        "type": "website",
+                        "customer_name": user.get("name", ""),
+                        "phone": user.get("phone", ""),
+                        "receiver_phone": receiver_phone,
+                        "address": user.get("address", ""),
+                        "delivery_address": delivery_address,
+                        "product_name": product.get("name", ""),
+                        "size": size,
+                        "type": option_type,
+                        "product_quantity": item.get("quantity", 0),
+                        "total_dozens": total_dozens,
+                        "total_price": item.get("price_at_purchase", 0) * item.get("quantity", 0),
+                        "CP": "",
+                        "SP": "",
+                        "payment_status_website": order.get("payment_status", ""),
+                        "delivery_status_website": order.get("order_status", ""),
+                        "payment_validation": "",
+                        "delivery_validation": "",
+                    }
+                    
+                    processed_orders.append(order_row)
+                
+                # Increment the order number after processing all items in the current order
+                order_number += 1
             
-            # Join all items
-            order_row["Items"] = ", ".join(items_text)
+            # Create orders DataFrame and write to sheet
+            if processed_orders:
+                orders_df = pd.DataFrame(processed_orders)
+                orders_df.to_excel(writer, sheet_name="orders", index=False)
+                
+                # Get the xlsxwriter workbook and worksheet objects
+                workbook = writer.book
+                worksheet = writer.sheets['orders']
+                
+                # Define formats for conditional formatting
+                duplicate_order_format = workbook.add_format({'bg_color': '#FFFF99'})  # Light yellow
+                same_customer_format = workbook.add_format({'bg_color': '#00e8ff'})  # Light Blue
+                paid_delivered_format = workbook.add_format({'bg_color': '#90EE90'})  # Light green
+                missing_size_format = workbook.add_format({'bg_color': '#FFCCCB'})  # Light red
+                
+                # Get number of rows and columns in the dataframe
+                max_row = len(orders_df) + 1
+                
+                # 1. Highlight duplicate order numbers
+                worksheet.conditional_format(f'B2:B{max_row}', {
+                    'type': 'duplicate',
+                    'format': duplicate_order_format
+                })
+                
+                # 2. Highlight cells where payment_status_website is "paid"
+                worksheet.conditional_format(f'P2:P{max_row}', {
+                    'type': 'text',
+                    'criteria': 'containing',
+                    'value': 'paid',
+                    'format': paid_delivered_format
+                })
+                
+                # 3. Highlight cells where delivery_status_website is "delivered"
+                worksheet.conditional_format(f'Q2:Q{max_row}', {
+                    'type': 'text',
+                    'criteria': 'containing',
+                    'value': 'delivered',
+                    'format': paid_delivered_format
+                })
+                
+                # 4. Highlight empty size cells
+                worksheet.conditional_format(f'J2:J{max_row}', {
+                    'type': 'blanks',
+                    'format': missing_size_format
+                })
+                
+                # 5. Custom formula to highlight rows with the same customer details
+                # Get columns for customer details
+                
+                # Formula to check if a row has the same customer details as the previous row
+                # Using formula for each row to check if all customer info fields match the previous row
+                for row in range(3, max_row + 1):  # Start from row 3 to compare with previous row
+                    worksheet.conditional_format(f'D{row}', {
+                        'type': 'formula',
+                        'criteria': f'=AND(D{row}=D{row-1}, D{row}=D{row-1}, E{row}=E{row-1}, F{row}=F{row-1}, G{row}=G{row-1})',
+                        'format': same_customer_format
+                    })
             
-            # Add to order data
-            order_data.append(order_row)
+            # PART 2: Create "users" sheet (now second)
+            users = await users_collection.find().to_list(1000)
+            users = serialize_list(users)
+            
+            # Process users data
+            processed_users = []
+            for i, user in enumerate(users, 1):
+                processed_users.append({
+                    "code": f"AM{i:03d}",
+                    "name": user.get("name", ""),
+                    "phone": user.get("phone", "")
+                })
+                
+            # Create users DataFrame and write to sheet
+            users_df = pd.DataFrame(processed_users)
+            users_df.to_excel(writer, sheet_name="users", index=False)
         
-        # Create DataFrame
-        df = pd.DataFrame(order_data)
+        # Return the Excel file data
+        output.seek(0)
+        return output.getvalue()
         
-        # Export based on format
-        if format_type == "excel":
-            file_path = export_excel(df)
-            send_email(email, "Order Export (Excel)", "Please find the attached order export file.", file_path)
-        elif format_type == "csv":
-            file_path = export_csv(df)
-            send_email(email, "Order Export (CSV)", "Please find the attached order export file.", file_path)
-        elif format_type == "google_sheets":
-            # Google Sheets requires OAuth, which is complex for this context
-            # As a simplification, we'll send Excel file with instructions
-            file_path = export_excel(df)
-            message = (
-                "Please find the attached order export file in Excel format.\n\n"
-                "To import this to Google Sheets:\n"
-                "1. Open Google Sheets\n"
-                "2. Create a new sheet\n"
-                "3. Go to File > Import > Upload\n"
-                "4. Upload the attached Excel file"
-            )
-            send_email(email, "Order Export (for Google Sheets)", message, file_path)
     except Exception as e:
-        # Send error email
-        error_message = f"An error occurred while exporting orders: {str(e)}"
-        send_email(email, "Order Export Error", error_message)
-
-
-def export_excel(df):
-    """Export DataFrame to Excel file"""
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name='Orders', index=False)
-    output.seek(0)
-    
-    # Save to temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
-        tmp.write(output.getvalue())
-        return tmp.name
-
-
-def export_csv(df):
-    """Export DataFrame to CSV file"""
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp:
-        df.to_csv(tmp.name, index=False)
-        return tmp.name
-
-
-def send_email(to_email, subject, message, attachment_path=None):
-    """Send email with optional attachment"""
-    try:
-        smtp_server = environ.get("SMTP_SERVER", "smtp.gmail.com")
-        smtp_port = int(environ.get("SMTP_PORT", 587))
-        smtp_user = environ.get("SMTP_USER")
-        smtp_pass = environ.get("SMTP_PASSWORD")
-        from_email = environ.get("FROM_EMAIL", smtp_user)
-        
-        # Create message
-        msg = MIMEMultipart()
-        msg['From'] = from_email
-        msg['To'] = to_email
-        msg['Subject'] = subject
-        
-        # Add message body
-        msg.attach(MIMEText(message, 'plain'))
-        
-        # Add attachment if provided
-        if attachment_path:
-            filename = path.basename(attachment_path)
-            attachment = open(attachment_path, "rb")
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header('Content-Disposition', f"attachment; filename= {filename}")
-            msg.attach(part)
-            attachment.close()
-        
-        # Send email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
-        
-        # Remove temporary file if it was an attachment
-        if attachment_path:
-            try:
-                os.unlink(attachment_path)
-            except:
-                pass
-    except Exception as e:
-        print(f"Error sending email: {str(e)}")
-
+        print(f"Error processing orders: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing orders: {str(e)}"
+        )
 
 # Helper functions
 
