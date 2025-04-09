@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Container, Typography, Box, Paper, Grid, Card, CardContent,
-  Button, List, ListItem, ListItemText, Divider, CircularProgress
+  Button, List, ListItem, ListItemText, Divider, CircularProgress,
+  Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
+  DialogContentText, Snackbar, Alert
 } from '@mui/material';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import PeopleIcon from '@mui/icons-material/People';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
 
@@ -21,6 +24,18 @@ const AdminDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloadMenuAnchor, setDownloadMenuAnchor] = useState(null);
+  const [errorDialog, setErrorDialog] = useState({
+    open: false,
+    message: '',
+    duplicates: []
+  });
+  const [notification, setNotification] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  const [downloadLoading, setDownloadLoading] = useState(false);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -69,6 +84,96 @@ const AdminDashboard = () => {
     
     fetchData();
   }, []);
+
+  const handleDownloadClick = (event) => {
+    setDownloadMenuAnchor(event.currentTarget);
+  };
+
+  const handleDownloadClose = () => {
+    setDownloadMenuAnchor(null);
+  };
+
+  const handleDownload = async (format) => {
+    handleDownloadClose();
+    
+    try {
+      setDownloadLoading(true);
+      const token = localStorage.getItem('token');
+      
+      // First validate users for duplicates
+      const validationResponse = await api.get('/admin/users/validate', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!validationResponse.data.valid) {
+        setErrorDialog({
+          open: true,
+          message: validationResponse.data.message,
+          duplicates: validationResponse.data.duplicates
+        });
+        return;
+      }
+      
+      // Download the file
+      const response = await api.get(`/admin/users/download?format=${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      
+      // Create a download link and click it
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'users';
+      if (format === 'excel') filename += '.xlsx';
+      if (format === 'vcf') filename += '.vcf';
+      
+      // Try to get filename from Content-Disposition header
+      if (contentDisposition) {
+        const matches = /filename=([^;]+)/ig.exec(contentDisposition);
+        if (matches && matches.length > 1) {
+          filename = matches[1].replace(/"/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setNotification({
+        open: true,
+        message: `User data successfully downloaded as ${format.toUpperCase()}`,
+        severity: 'success'
+      });
+      
+    } catch (error) {
+      console.error(`Error downloading ${format} file:`, error);
+      setNotification({
+        open: true,
+        message: `Failed to download user data. ${error.message || ''}`,
+        severity: 'error'
+      });
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
+  const handleCloseErrorDialog = () => {
+    setErrorDialog({
+      ...errorDialog,
+      open: false
+    });
+  };
+
+  const handleCloseNotification = () => {
+    setNotification({
+      ...notification,
+      open: false
+    });
+  };
 
   return (
     <Container maxWidth="lg" className="py-8">
@@ -262,6 +367,15 @@ const AdminDashboard = () => {
                   >
                     Create Order
                   </Button>
+                  <Button
+                    variant="contained"
+                    className="w-full sm:col-span-2"
+                    startIcon={<DownloadIcon />}
+                    onClick={handleDownloadClick}
+                    disabled={downloadLoading}
+                  >
+                    {downloadLoading ? 'Downloading...' : 'Download User Info'}
+                  </Button>
                 </Box>
               </Paper>
               
@@ -296,6 +410,84 @@ const AdminDashboard = () => {
           </Grid>
         </>
       )}
+      
+      {/* Download Format Menu */}
+      <Menu
+        anchorEl={downloadMenuAnchor}
+        open={Boolean(downloadMenuAnchor)}
+        onClose={handleDownloadClose}
+      >
+        <MenuItem onClick={() => handleDownload('excel')}>
+          Download as Excel (.xlsx)
+        </MenuItem>
+        <MenuItem onClick={() => handleDownload('vcf')}>
+          Download as Contacts (.vcf)
+        </MenuItem>
+      </Menu>
+      
+      {/* Error Dialog for Duplicate Phone Numbers */}
+      <Dialog
+        open={errorDialog.open}
+        onClose={handleCloseErrorDialog}
+        aria-labelledby="duplicate-dialog-title"
+      >
+        <DialogTitle id="duplicate-dialog-title">
+          Cannot Download User Data
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {errorDialog.message}
+          </DialogContentText>
+          {errorDialog.duplicates && errorDialog.duplicates.length > 0 && (
+            <>
+              <Typography variant="subtitle2" className="mt-3 mb-1">
+                Duplicate phone numbers:
+              </Typography>
+              <Box className="max-h-40 overflow-y-auto">
+                <List dense>
+                  {errorDialog.duplicates.map((phone, index) => (
+                    <ListItem key={index}>
+                      <ListItemText primary={phone} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+              <DialogContentText className="mt-3">
+                Please resolve these duplicate entries before downloading user data.
+              </DialogContentText>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseErrorDialog} color="primary" autoFocus>
+            Close
+          </Button>
+          <Button 
+            component={Link} 
+            to="/admin/users" 
+            color="primary"
+            onClick={handleCloseErrorDialog}
+          >
+            Manage Users
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Notification Snackbar */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={5000}
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseNotification} 
+          severity={notification.severity}
+          variant="filled"
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

@@ -7,7 +7,12 @@ from typing import Optional, List
 import os
 from dotenv import load_dotenv
 from bson import ObjectId
-
+import csv
+import io
+import pandas as pd
+from fastapi.responses import StreamingResponse
+from tempfile import NamedTemporaryFile
+from datetime import date
 from database import users_collection, serialize_doc_id, serialize_list
 from models import UserCreate, UserResponse, UserUpdate, LoginRequest, Token, UserInDB
 
@@ -340,3 +345,112 @@ async def create_admin():
 
     result = await users_collection.insert_one(admin_data)
     return {"message": "Admin created successfully", "id": str(result.inserted_id)}
+
+@router.get("/admin/users/validate")
+async def validate_users(current_user: UserInDB = Depends(get_current_user)):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+    
+    # Get all users
+    users = await users_collection.find().to_list(1000)
+    
+    # Check for duplicate phone numbers
+    phone_numbers = {}
+    duplicates = []
+    
+    for user in users:
+        phone = user.get("phone")
+        if phone in phone_numbers:
+            duplicates.append(phone)
+        else:
+            phone_numbers[phone] = 1
+    
+    if duplicates:
+        return {
+            "valid": False,
+            "message": f"Found {len(duplicates)} duplicate phone numbers",
+            "duplicates": duplicates
+        }
+    
+    return {"valid": True, "message": "All users have unique phone numbers"}
+
+
+@router.get("/admin/users/download")
+async def download_users(
+    format: str = "excel",
+    current_user: UserInDB = Depends(get_current_user)
+):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+    
+    # Get all users
+    users = await users_collection.find().to_list(1000)
+    users = serialize_list(users)
+    
+    # Process users data
+    processed_users = []
+    for i, user in enumerate(users, 1):
+        # if user.get("is_admin", False):
+        #     continue  # Skip admin users
+            
+        processed_users.append({
+            "code": f"AM{i:03d}",
+            "name": user.get("name", ""),
+            "phone": user.get("phone", "")
+        })
+    
+    today = date.today().strftime("%d-%b-%Y")
+    
+    if format.lower() == "excel":
+        # Create Excel file
+        df = pd.DataFrame(processed_users)
+        
+        with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp:
+            writer = pd.ExcelWriter(temp.name, engine="xlsxwriter")
+            df.to_excel(writer, sheet_name="users", index=False)
+            writer.close()
+            
+            with open(temp.name, "rb") as f:
+                contents = f.read()
+        
+        headers = {
+            "Content-Disposition": f"attachment; filename=AmBhiKhareeda_Users_{today}.xlsx"
+        }
+        return StreamingResponse(
+            io.BytesIO(contents),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers
+        )
+        
+    elif format.lower() == "vcf":
+        # Create VCF file
+        output = io.StringIO()
+        
+        for user in processed_users:
+            output.write("BEGIN:VCARD\n")
+            output.write("VERSION:3.0\n")
+            output.write(f"N:{user['name']};{user['code']};;;\n")
+            output.write(f"FN:{user['code']} {user['name']}\n")
+            output.write(f"TEL;TYPE=CELL:{user['phone']}\n")
+            output.write("END:VCARD\n")
+        
+        headers = {
+            "Content-Disposition": f"attachment; filename=AmBhiKhareeda_Contacts_{today}.vcf"
+        }
+        return StreamingResponse(
+            io.StringIO(output.getvalue()),
+            media_type="text/vcard",
+            headers=headers
+        )
+    
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid format specified. Use 'excel' or 'vcf'."
+        )
