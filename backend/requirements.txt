@@ -1,5 +1,4 @@
 asposestorage==1.0.2
-database==0.6.0
 fastapi==0.115.12
 motor==3.7.0
 pandas==2.2.3
