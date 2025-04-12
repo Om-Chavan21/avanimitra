@@ -6,7 +6,7 @@ import {
   CircularProgress, FormControl, InputLabel, Select, MenuItem, 
   Chip, Tab, Tabs, Divider, Card, CardContent, CardMedia, Alert,
   TextField, IconButton, Tooltip, Autocomplete, RadioGroup, 
-  Radio, FormControlLabel, FormLabel
+  Radio, FormControlLabel, FormLabel, Checkbox, Toolbar, InputAdornment
 } from '@mui/material';
 import { Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -15,6 +15,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
+import Switch from '@mui/material/Switch';
 
 const OrderManagement = () => {
   const [searchParams] = useSearchParams();
@@ -55,6 +56,12 @@ const OrderManagement = () => {
   const [tabValue, setTabValue] = useState(0);
   
   const [users, setUsers] = useState({});
+
+  // New state variables for bulk actions
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+  const [bulkStatusDialogOpen, setBulkStatusDialogOpen] = useState(false);
+  const [bulkNewStatus, setBulkNewStatus] = useState('');
+  const [bulkNewPaymentStatus, setBulkNewPaymentStatus] = useState('');
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -162,6 +169,76 @@ const OrderManagement = () => {
   
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+    // Clear selections when changing tabs
+    setSelectedOrderIds([]);
+  };
+  
+  // New function to handle checkbox selection
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrderIds(prev => {
+      if (prev.includes(orderId)) {
+        return prev.filter(id => id !== orderId);
+      } else {
+        return [...prev, orderId];
+      }
+    });
+  };
+
+  // Select or deselect all displayed orders
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      setSelectedOrderIds(displayOrders.map(order => order.id));
+    } else {
+      setSelectedOrderIds([]);
+    }
+  };
+
+  // Open bulk status update dialog
+  const handleOpenBulkStatusDialog = () => {
+    setBulkNewStatus('');
+    setBulkNewPaymentStatus('');
+    setBulkStatusDialogOpen(true);
+  };
+
+  // Close bulk status update dialog
+  const handleCloseBulkStatusDialog = () => {
+    setBulkStatusDialogOpen(false);
+  };
+
+  // Handle bulk status update
+  const handleBulkUpdateStatus = async () => {
+    if (selectedOrderIds.length === 0 || 
+        (bulkNewStatus === '' && bulkNewPaymentStatus === '')) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const token = localStorage.getItem('token');
+      await api.put(
+        `/admin/orders/bulk-update`, 
+        { 
+          order_ids: selectedOrderIds,
+          order_status: bulkNewStatus || undefined,
+          payment_status: bulkNewPaymentStatus || undefined
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      setSuccess(`${selectedOrderIds.length} orders updated successfully!`);
+      fetchOrders();
+      handleCloseBulkStatusDialog();
+      setSelectedOrderIds([]); // Clear selection after update
+    } catch (err) {
+      setError(`Failed to update orders: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   const handleViewOrder = (order) => {
@@ -517,6 +594,10 @@ const OrderManagement = () => {
   
   const displayOrders = tabValue === 0 ? activeOrders : pastOrders;
 
+  // Determine if some or all orders are selected
+  const numSelected = selectedOrderIds.length;
+  const rowCount = displayOrders.length;
+
   return (
     <Container maxWidth="lg" className="py-8">
       <Typography variant="h4" component="h1" gutterBottom>
@@ -548,6 +629,35 @@ const OrderManagement = () => {
         </Tabs>
       </Paper>
       
+      {/* Bulk Actions Toolbar - Visible when orders are selected */}
+      {numSelected > 0 && (
+        <Paper className="mb-4 p-2">
+          <Toolbar
+            sx={{
+              pl: { sm: 2 },
+              pr: { xs: 1, sm: 1 },
+            }}
+          >
+            <Typography
+              sx={{ flex: '1 1 100%' }}
+              color="inherit"
+              variant="subtitle1"
+              component="div"
+            >
+              {numSelected} selected
+            </Typography>
+            <Button 
+              variant="contained" 
+              color="primary"
+              onClick={handleOpenBulkStatusDialog}
+              startIcon={<EditIcon />}
+            >
+              Update Status
+            </Button>
+          </Toolbar>
+        </Paper>
+      )}
+      
       {loading ? (
         <Box display="flex" justifyContent="center" p={4}>
           <CircularProgress />
@@ -563,6 +673,17 @@ const OrderManagement = () => {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    color="primary"
+                    indeterminate={numSelected > 0 && numSelected < rowCount}
+                    checked={rowCount > 0 && numSelected === rowCount}
+                    onChange={handleSelectAll}
+                    inputProps={{
+                      'aria-label': 'select all orders',
+                    }}
+                  />
+                </TableCell>
                 <TableCell>Order ID</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Customer Name</TableCell>
@@ -575,8 +696,22 @@ const OrderManagement = () => {
             </TableHead>
             <TableBody>
               {displayOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell>#{order.id.substring(0, 8)}</TableCell>
+                <TableRow 
+                  key={order.id}
+                  selected={selectedOrderIds.includes(order.id)}
+                  hover
+                >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      color="primary"
+                      checked={selectedOrderIds.includes(order.id)}
+                      onChange={() => handleSelectOrder(order.id)}
+                      inputProps={{
+                        'aria-labelledby': `order-${order.id}`,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell id={`order-${order.id}`}>#{order.id.substring(0, 8)}</TableCell>
                   <TableCell>{formatDate(order.order_date)}</TableCell>
                   <TableCell>{users[order.user_id]}</TableCell>
                   <TableCell>{order.items.length} items</TableCell>
@@ -794,7 +929,7 @@ const OrderManagement = () => {
                 Close
               </Button>
               <Button 
-                variant=" contained" 
+                variant="contained" 
                 color="primary"
                 onClick={() => {
                   handleCloseViewDialog();
@@ -1285,6 +1420,69 @@ const OrderManagement = () => {
             disabled={!selectedProduct || (selectedProduct.has_price_options && !selectedOption && !useCustomItemRate)}
           >
             Add Product
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Status Update Dialog */}
+      <Dialog open={bulkStatusDialogOpen} onClose={handleCloseBulkStatusDialog}>
+        <DialogTitle>
+          Update Multiple Orders ({selectedOrderIds.length})
+        </DialogTitle>
+        <DialogContent>
+          <Box className="pt-2 space-y-4">
+            <Alert severity="info" className="mb-3">
+              Leave a field empty if you don't want to update that status.
+            </Alert>
+            
+            <FormControl fullWidth>
+              <InputLabel>Order Status</InputLabel>
+              <Select
+                value={bulkNewStatus}
+                onChange={(e) => setBulkNewStatus(e.target.value)}
+                label="Order Status"
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Don't change</em>
+                </MenuItem>
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="processing">Processing</MenuItem>
+                <MenuItem value="shipped">Shipped</MenuItem>
+                <MenuItem value="delivered">Delivered</MenuItem>
+                <MenuItem value="cancelled">Cancelled</MenuItem>
+              </Select>
+            </FormControl>
+            
+            <FormControl fullWidth>
+              <InputLabel>Payment Status</InputLabel>
+              <Select
+                value={bulkNewPaymentStatus}
+                onChange={(e) => setBulkNewPaymentStatus(e.target.value)}
+                label="Payment Status"
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Don't change</em>
+                </MenuItem>
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="paid">Paid</MenuItem>
+                <MenuItem value="failed">Failed</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseBulkStatusDialog} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleBulkUpdateStatus} 
+            variant="contained" 
+            color="primary"
+            disabled={isSubmitting || (bulkNewStatus === '' && bulkNewPaymentStatus === '')}
+          >
+            {isSubmitting ? <CircularProgress size={24} /> : 'Update All'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -236,6 +236,61 @@ async def get_all_orders(
     return order_responses
 
 
+@router.put("/admin/orders/bulk-update")
+async def bulk_update_orders(
+    update_data: dict,
+    current_user: UserInDB = Depends(get_current_user),
+):
+    """
+    Bulk update multiple orders at once
+    Body should contain:
+    - order_ids: list of order IDs to update
+    - order_status: optional new order status
+    - payment_status: optional new payment status
+    """
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+    
+    # Validate input
+    order_ids = update_data.get("order_ids", [])
+    if not order_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No order IDs provided"
+        )
+    
+    # Prepare update data
+    update_fields = {}
+    if "order_status" in update_data and update_data["order_status"]:
+        update_fields["order_status"] = update_data["order_status"]
+        
+    if "payment_status" in update_data and update_data["payment_status"]:
+        update_fields["payment_status"] = update_data["payment_status"]
+    
+    if not update_fields:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No update fields provided"
+        )
+    
+    # Convert string IDs to ObjectId
+    object_ids = [ObjectId(id) for id in order_ids]
+    
+    # Update all matching orders
+    result = await orders_collection.update_many(
+        {"_id": {"$in": object_ids}},
+        {"$set": update_fields}
+    )
+    
+    return {
+        "message": f"Updated {result.modified_count} orders",
+        "modified_count": result.modified_count
+    }
+
+
 @router.put("/admin/orders/{order_id}", response_model=OrderResponse)
 async def update_order(
     order_id: str,
