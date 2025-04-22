@@ -215,12 +215,16 @@ class OrderExportRequest(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     include_all_fields: bool = True
-    status_filter: str = "all"  # all, pending, processing, shipped, delivered, cancelled
+    status_filter: str = (
+        "all"  # all, pending, processing, shipped, delivered, cancelled
+    )
+
 
 class SurveyProductOption(BaseModel):
     product_name: str
     quantity: str
     frequency: str  # weekly, monthly, etc.
+
 
 class SurveyResponse(BaseModel):
     name: str
@@ -231,17 +235,20 @@ class SurveyResponse(BaseModel):
     product_preferences: List[SurveyProductOption]
     created_at: Optional[datetime] = None
 
+
 class SurveyProductCreate(BaseModel):
     name: str
     description: Optional[str] = None
     available_quantities: Optional[List[str]] = None
     category: Optional[str] = None
 
+
 class SurveyProductUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     available_quantities: Optional[List[str]] = None
     category: Optional[str] = None
+
 
 class SurveyProductResponse(SurveyProductCreate):
     id: str

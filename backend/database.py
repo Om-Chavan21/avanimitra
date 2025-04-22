@@ -19,6 +19,7 @@ payment_settings_collection = database.payment_settings
 survey_products_collection = database.survey_products
 survey_responses_collection = database.survey_responses
 
+
 # Helper functions to convert between MongoDB ObjectId and string
 def get_object_id(id_str):
     if isinstance(id_str, str):
@@ -159,13 +160,18 @@ async def get_survey_products():
     products = await survey_products_collection.find().to_list(1000)
     return serialize_list(products)
 
+
 async def get_survey_product(product_id):
-    product = await survey_products_collection.find_one({"_id": get_object_id(product_id)})
+    product = await survey_products_collection.find_one(
+        {"_id": get_object_id(product_id)}
+    )
     return serialize_doc_id(product)
+
 
 async def create_survey_product(product_data):
     result = await survey_products_collection.insert_one(product_data)
     return await get_survey_product(result.inserted_id)
+
 
 async def update_survey_product(product_id, product_data):
     await survey_products_collection.update_one(
@@ -173,18 +179,22 @@ async def update_survey_product(product_id, product_data):
     )
     return await get_survey_product(product_id)
 
+
 async def delete_survey_product(product_id):
     await survey_products_collection.delete_one({"_id": get_object_id(product_id)})
+
 
 # Survey response operations
 async def get_survey_responses():
     responses = await survey_responses_collection.find().to_list(1000)
     return serialize_list(responses)
 
+
 async def create_survey_response(response_data):
     response_data["created_at"] = datetime.utcnow()
     result = await survey_responses_collection.insert_one(response_data)
     return await survey_responses_collection.find_one({"_id": result.inserted_id})
+
 
 async def get_user_survey_response(mobile):
     response = await survey_responses_collection.find_one({"mobile": mobile})
